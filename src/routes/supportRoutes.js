@@ -55,7 +55,7 @@ const router = express.Router();
  *             schema:
  *               $ref: '#/components/schemas/ApiResponse'
  */
-
+// create support ticket
 router.post(
   "/",
   authenticate,
@@ -63,31 +63,37 @@ router.post(
   validate(supportSchema),
   createSupportTicket
 );
+// get ticket by customer id
 router.get("/customer/:customerId", authenticate, getSupportTicketsByCustomer);
+// get all tickets
 router.get(
   "/",
   authenticate,
   authorize("admin", "userpannel"),
   getAllSupportTickets
 );
+// get ticket by id
 router.get(
   "/:id",
   authenticate,
   authorize("admin", "userpannel"),
   getSupportTicketById
 );
+// update ticket
 router.put(
   "/:id",
   authenticate,
   authorize("admin", "userpannel"),
   updateSupportTicket
 );
+// change ticket status
 router.patch(
   "/:id/status",
   authenticate,
   authorize("admin", "userpannel"),
   changeSupportTicketStatus
 );
+// delete ticket
 router.delete(
   "/:id",
   authenticate,

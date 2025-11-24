@@ -54,6 +54,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ApiResponse'
  */
 
+// create product
 router.post(
   "/createproduct",
   authenticate,
@@ -61,28 +62,36 @@ router.post(
   validate(productSchema),
   createProduct
 );
+// get all products
 router.get("/getallproducts", getAllProducts);
+// get active products
 router.get("/getactiveproducts", getActiveProducts);
+// get bestseller
 router.get("/getbestsellerproducts", getBestSellerProducts);
+// get by id
 router.get("/getproductbyid/:id", getProductById);
+// update
 router.put(
   "/updateproduct/:id",
   authenticate,
   authorize("admin", "userpannel"),
   updateProduct
 );
+// delete
 router.delete(
   "/deleteproduct/:id",
   authenticate,
   authorize("admin", "userpannel"),
   deleteProduct
 );
+// status patch
 router.patch(
   "/togglestatus/:id",
   authenticate,
   authorize("admin", "userpannel"),
   toggleProductStatus
 );
+// bestseller patch
 router.patch(
   "/togglebestseller/:id",
   authenticate,
@@ -95,6 +104,7 @@ router.patch(
   authorize("admin", "userpannel"),
   toggleHideProduct
 );
+// update stock
 router.post(
   "/:id/stock",
   authenticate,

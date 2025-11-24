@@ -75,10 +75,15 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ApiResponse'
  */
 
+// signup
 router.post("/signup", validate(signupSchema), signup);
+// login
 router.post("/login", validate(loginSchema), login);
+// forgot pwd
 router.post("/forgot-password", validate(forgotPasswordSchema), forgotPassword);
+// reset pwd
 router.post("/reset-password", validate(resetPasswordSchema), resetPassword);
+// change pwd
 router.post(
   "/change-password",
   authenticate,

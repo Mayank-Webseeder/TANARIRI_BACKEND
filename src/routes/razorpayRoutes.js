@@ -58,7 +58,9 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ApiResponse'
  */
 
+// create order
 router.post("/create-order", authenticate, createOrder);
+// verify order
 router.post("/verify", authenticate, verifyPayment);
 
 export default router;

@@ -69,9 +69,13 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ApiResponse'
  */
 
+// create user
 router.post("/", validate(createUserSchema), createUser);
+// get user
 router.get("/", authenticate, authorize("admin", "userpannel"), getAllUsers);
+// get user by id
 router.get("/:id", authenticate, authorize("admin", "userpannel"), getUserById);
+// update user
 router.put(
   "/:id",
   authenticate,
@@ -79,12 +83,14 @@ router.put(
   validate(updateUserSchema),
   updateUser
 );
+// activate/deactivate user
 router.patch(
   "/:id/activate",
   authenticate,
   authorize("admin", "userpannel"),
   activateUser
 );
+// delete user
 router.delete("/:id", authenticate, authorize("admin"), deleteUser);
 
 export default router;

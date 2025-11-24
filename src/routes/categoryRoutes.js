@@ -48,6 +48,7 @@ const router = express.Router();
  *               $ref: '#/components/schemas/ApiResponse'
  */
 
+// create category
 router.post(
   "/createcategory",
   authenticate,
@@ -55,8 +56,11 @@ router.post(
   validate(categorySchema),
   createCategory
 );
+// get category
 router.get("/getallcategories", getAllCategories);
+// get cat. by id
 router.get("/getcategory/:id", getCategoryById);
+// update category
 router.put(
   "/updatecategory/:id",
   authenticate,
@@ -64,6 +68,7 @@ router.put(
   validate(categorySchema),
   updateCategory
 );
+// delete category
 router.delete(
   "/deletecategory/:id",
   authenticate,

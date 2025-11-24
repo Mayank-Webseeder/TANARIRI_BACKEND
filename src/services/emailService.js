@@ -1,5 +1,5 @@
-import nodemailer from 'nodemailer';
-import { config } from '../config/env.js';
+import nodemailer from "nodemailer";
+import { config } from "../config/env.js";
 
 const transporter = nodemailer.createTransport({
   host: config.mail.host,
@@ -20,16 +20,16 @@ export const sendEmail = async (to, subject, html) => {
       html,
     });
 
-    console.log('Email sent:', info.messageId);
+    console.log("Email sent:", info.messageId);
     return info;
   } catch (error) {
-    console.error('Email error:', error);
+    console.error("Email error:", error);
     throw error;
   }
 };
 
 export const sendPasswordResetEmail = async (to, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
   const html = `
     <h1>Password Reset Request</h1>
@@ -39,7 +39,7 @@ export const sendPasswordResetEmail = async (to, resetToken) => {
     <p>If you didn't request this, please ignore this email.</p>
   `;
 
-  await sendEmail(to, 'Password Reset Request', html);
+  await sendEmail(to, "Password Reset Request", html);
 };
 
 export const sendWelcomeEmail = async (to, firstName) => {
@@ -50,5 +50,5 @@ export const sendWelcomeEmail = async (to, firstName) => {
     <p>Start exploring our products and enjoy shopping with us.</p>
   `;
 
-  await sendEmail(to, 'Welcome!', html);
+  await sendEmail(to, "Welcome!", html);
 };
