@@ -15,7 +15,10 @@ import {
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
 import { validate } from "../middlewares/validate.js";
-import { customerOrderSchema, orderSchema } from "../utils/validationSchemas.js";
+import {
+  customerOrderSchema,
+  orderSchema,
+} from "../utils/validationSchemas.js";
 
 const router = express.Router();
 
@@ -98,18 +101,14 @@ router.get(
   authorize("admin", "userpannel"),
   getOrdersByCustomerId
 );
-// get order by id
 router.get("/getOrders/:id", authenticate, getOrderById);
-// get invoice
 router.get("/:id/invoice", authenticate, generateInvoice);
-// update order
 router.patch(
   "/updateOrdersById/:id",
   authenticate,
   authorize("admin", "userpannel"),
   updateOrder
 );
-// update order status
 router.patch(
   "/updateOrdersStatus/:id/status",
   authenticate,
