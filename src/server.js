@@ -33,6 +33,7 @@ const allowedOrigins = [
   "https://tanariry.netlify.app",
   "http://localhost:5173",
   "http://localhost:3000",
+  "tanariry-user.netlify.app",
 ];
 
 app.use(
