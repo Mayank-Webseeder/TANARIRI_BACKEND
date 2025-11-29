@@ -30,6 +30,7 @@ app.use(helmet());
 const allowedOrigins = [
   "https://crockery-e-com-dashboard.netlify.app",
   "https://tanariri-frontend.vercel.app",
+  "https://tanariry.netlify.app",
   "http://localhost:5173",
   "http://localhost:3000",
 ];
