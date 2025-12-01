@@ -29,7 +29,7 @@ export const sendEmail = async (to, subject, html) => {
 };
 
 export const sendPasswordResetEmail = async (to, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+  const resetUrl = `${process.env.FRONTEND_URL}/forgot-password?token=${resetToken}`;
 
   const html = `
     <h1>Password Reset Request</h1>
