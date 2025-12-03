@@ -67,22 +67,22 @@ app.use(express.urlencoded({ extended: true }));
 // app.use(limiter);
 
 // Rate limit - login/signup special
-app.use(
-  "/api/auth/login",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    message: "Too many login attempts, please try again later.",
-  })
-);
-app.use(
-  "/api/auth/signup",
-  rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 3,
-    message: "Too many signup attempts, please try again later.",
-  })
-);
+// app.use(
+//   "/api/auth/login",
+//   rateLimit({
+//     windowMs: 15 * 60 * 1000,
+//     max: 5,
+//     message: "Too many login attempts, please try again later.",
+//   })
+// );
+// app.use(
+//   "/api/auth/signup",
+//   rateLimit({
+//     windowMs: 60 * 60 * 1000,
+//     max: 3,
+//     message: "Too many signup attempts, please try again later.",
+//   })
+// );
 
 // Swagger docs
 app.use(
