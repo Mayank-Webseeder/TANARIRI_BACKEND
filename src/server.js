@@ -19,6 +19,7 @@ import productRoutes from "./routes/productRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import razorpayRoutes from "./routes/razorpayRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import shippingRoutes from "./routes/shippingRoutes.js";
 
 const app = express();
 
@@ -27,7 +28,7 @@ connectDatabase();
 // Helmet
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" }, 
+    crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginEmbedderPolicy: false,
   })
 );
@@ -129,6 +130,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/shipping", shippingRoutes);
 
 // 404 Not Found
 app.use("*", (req, res) => {
