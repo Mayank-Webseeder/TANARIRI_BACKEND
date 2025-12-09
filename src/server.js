@@ -1,4 +1,5 @@
 import express from "express";
+import http from "http";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -11,6 +12,7 @@ import { config } from "./config/env.js";
 import { connectDatabase } from "./config/database.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { swaggerSpec } from "./docs/swagger.js";
+import { initializeSocket } from "./config/socket.js";
 
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -19,6 +21,7 @@ import productRoutes from "./routes/productRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import razorpayRoutes from "./routes/razorpayRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 const app = express();
 
@@ -44,6 +47,7 @@ const allowedOrigins = [
   "https://tanaririllp.com",
   "https://tanariri-dashboard.netlify.app",
   "https://tanariri-website.netlify.app",
+  "https://api.tanaririllp.com",
 ];
 
 app.use(
@@ -129,6 +133,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/support", supportRoutes);
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // 404 Not Found
 app.use("*", (req, res) => {
@@ -160,9 +165,14 @@ app.use(errorHandler);
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`.bgCyan);
-  console.log(`API Documentation: http://localhost:${PORT}/api-docs`.bgYellow);
+const server = http.createServer(app);
+
+initializeSocket(server);
+
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`.black.bgCyan);
+  console.log(`API Documentation: http://localhost:${PORT}/api-docs`.black.bgYellow);
+  console.log(`WebSocket Server initialized on port ${PORT}`.black.bgGreen);
 });
 
 export default app;

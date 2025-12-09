@@ -3,6 +3,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { createRazorpayOrder, verifyRazorpaySignature } from '../services/razorpayService.js';
 import Order from '../models/Order.js';
+import { notifyOrderCreated, notifyAdminNewOrder } from "../services/orderNotificationService.js";
 
 export const createOrder = asyncHandler(async (req, res) => {
   const { amount, currency, receipt } = req.body;
@@ -35,13 +36,27 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   }
 
   if (orderId) {
-    await Order.findByIdAndUpdate(orderId, {
-      'paymentInfo.razorpayOrderId': razorpay_order_id,
-      'paymentInfo.razorpayPaymentId': razorpay_payment_id,
-      'paymentInfo.razorpaySignature': razorpay_signature,
-      'paymentInfo.status': 'completed',
-      status: 'confirmed',
-    });
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      {
+        'paymentInfo.razorpayOrderId': razorpay_order_id,
+        'paymentInfo.razorpayPaymentId': razorpay_payment_id,
+        'paymentInfo.razorpaySignature': razorpay_signature,
+        'paymentInfo.status': 'completed',
+        status: 'confirmed',
+      },
+      { new: true }
+    ).populate('customerId', 'firstName lastName email');
+
+    if (order) {
+      notifyOrderCreated(order);
+
+      const customerInfo = {
+        firstName: order.customerId.firstName || 'Customer',
+        lastName: order.customerId.lastName || '',
+      };
+      notifyAdminNewOrder(order, customerInfo);
+    }
   }
 
   res.json(new ApiResponse(200, 'Payment verified successfully', { isValid: true }));

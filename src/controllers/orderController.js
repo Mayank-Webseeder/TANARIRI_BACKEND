@@ -6,6 +6,16 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { createRazorpayOrder } from "../services/razorpayService.js";
 import PDFDocument from "pdfkit";
+import {
+  notifyOrderCreated,
+  notifyAdminNewOrder,
+  notifyOrderStatusChanged,
+  notifyReturnRequestSubmitted,
+  notifyAdminReturnRequest,
+  notifyReturnRequestApproved,
+  notifyReturnRequestRejected,
+  notifyReturnCompleted,
+} from "../services/orderNotificationService.js";
 
 export const createOrder = asyncHandler(async (req, res) => {
   const { customerId, items, totalAmount, shippingAddress, paymentInfo } =
@@ -108,6 +118,12 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
     );
 
     await session.commitTransaction();
+
+    notifyOrderCreated(order[0]);
+    notifyAdminNewOrder(order[0], {
+      firstName: req.user.firstName,
+      lastName: req.user.lastName,
+    });
 
     res.status(201).json(
       new ApiResponse(201, "Order created successfully", {
@@ -229,8 +245,11 @@ export const changeOrderStatus = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Order not found");
   }
 
+  const oldStatus = order.status;
   order.status = status;
   await order.save();
+
+  notifyOrderStatusChanged(order, oldStatus, status);
 
   res.json(new ApiResponse(200, "Order status updated successfully", order));
 });
@@ -449,6 +468,12 @@ export const submitReturnRequest = asyncHandler(async (req, res) => {
   order.status = "return_requested";
   await order.save();
 
+  notifyReturnRequestSubmitted(order);
+  notifyAdminReturnRequest(order, {
+    firstName: req.user.firstName,
+    lastName: req.user.lastName,
+  });
+
   res
     .status(200)
     .json(new ApiResponse(200, "Return request submitted successfully", order));
@@ -484,6 +509,8 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
 
   order.status = "return_approved";
   await order.save();
+
+  notifyReturnRequestApproved(order);
 
   res
     .status(200)
@@ -522,6 +549,8 @@ export const rejectReturnRequest = asyncHandler(async (req, res) => {
 
   order.status = "return_rejected";
   await order.save();
+
+  notifyReturnRequestRejected(order);
 
   res.status(200).json(new ApiResponse(200, "Return request rejected", order));
 });
@@ -568,6 +597,8 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
     await order.save({ session });
 
     await session.commitTransaction();
+
+    notifyReturnCompleted(order);
 
     res
       .status(200)
