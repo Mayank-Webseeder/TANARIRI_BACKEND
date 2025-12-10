@@ -32,7 +32,7 @@ export const signup = asyncHandler(async (req, res) => {
     console.error('Failed to send welcome email:', error);
   }
 
-  const token = generateToken(user._id);
+  const token = generateToken(user._id, user.role);
 
   const userResponse = user.toObject();
   delete userResponse.password;
@@ -62,7 +62,7 @@ export const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Invalid credentials');
   }
 
-  const token = generateToken(user._id);
+  const token = generateToken(user._id, user.role);
 
   const userResponse = user.toObject();
   delete userResponse.password;
