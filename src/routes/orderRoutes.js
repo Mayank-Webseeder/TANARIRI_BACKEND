@@ -18,6 +18,8 @@ import {
   getAllReturnRequests,
   getMyReturnRequests,
   cancelReturnRequest,
+  cancelOrderByCustomer,
+  shipOrderWithDelhivery,
 } from "../controllers/orderController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -44,6 +46,13 @@ router.post(
   authorize("customer"),
   validate(customerOrderSchema),
   createOrderByCustomer
+);
+
+router.post(
+  "/:id/cancel-by-customer",
+  authenticate,
+  authorize("customer"),
+  cancelOrderByCustomer
 );
 
 router.get(
@@ -141,6 +150,12 @@ router.patch(
   changeOrderStatus
 );
 
+router.post(
+  "/:id/ship-with-delhivery",
+  authenticate,
+  authorize("admin", "userpannel"),
+  shipOrderWithDelhivery
+);
 router.delete("/:id", authenticate, authorize("admin"), deleteOrder);
 
 export default router;

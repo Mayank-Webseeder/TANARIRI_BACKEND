@@ -16,6 +16,23 @@ import {
   notifyReturnRequestRejected,
   notifyReturnCompleted,
 } from "../services/orderNotificationService.js";
+import axios from "axios";
+import Razorpay from "razorpay";
+
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_TEST_KEY_ID,
+  key_secret: process.env.RAZORPAY_TEST_KEY_SECRET,
+});
+const DELHIVERY_BASE_URL = "https://track.delhivery.com";
+const DELHIVERY_API_TOKEN = "7c61e302ae5975c0ad42d6bb555b5b12c9ee3b9c";
+
+function getDelhiveryHeaders() {
+  return {
+    Authorization: `Token ${DELHIVERY_API_TOKEN}`,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+}
 
 export const createOrder = asyncHandler(async (req, res) => {
   const { customerId, items, totalAmount, shippingAddress, paymentInfo } =
@@ -137,6 +154,62 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
   } finally {
     session.endSession();
   }
+});
+
+export const cancelOrderByCustomer = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const customerId = req.user._id;
+
+  const order = await Order.findById(id);
+
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  if (order.customerId.toString() !== customerId.toString()) {
+    throw new ApiError(403, "Access denied");
+  }
+
+  if (!["pending", "confirmed"].includes(order.status)) {
+    throw new ApiError(
+      400,
+      "Order can only be cancelled in pending or confirmed status"
+    );
+  }
+
+  let refund = null;
+
+  if (
+    order.paymentInfo &&
+    order.paymentInfo.status === "completed" &&
+    order.paymentInfo.razorpayPaymentId
+  ) {
+    const amountInPaise = Math.round(order.totalAmount * 100);
+
+    refund = await razorpay.payments.refund(
+      order.paymentInfo.razorpayPaymentId,
+      {
+        amount: amountInPaise,
+        speed: "normal",
+        notes: {
+          order_id: order._id.toString(),
+          reason: "Customer cancellation before shipping",
+        },
+      }
+    );
+
+    order.paymentInfo.status = "refunded";
+  }
+
+  order.status = "cancelled";
+  await order.save();
+
+  return res.json(
+    new ApiResponse(200, "Order cancelled and refund processed", {
+      order,
+      refund,
+    })
+  );
 });
 
 export const getAllOrders = asyncHandler(async (req, res) => {
@@ -697,4 +770,102 @@ export const cancelReturnRequest = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json(new ApiResponse(200, "Return request cancelled successfully", order));
+});
+
+export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const order = await Order.findById(id).populate(
+    "customerId",
+    "firstName lastName phone email"
+  );
+
+  if (!order) {
+    throw new ApiError(404, "Order not found");
+  }
+
+  if (order.waybill) {
+    return res.json(
+      new ApiResponse(200, "Shipment already created for this order", order)
+    );
+  }
+
+  if (!order.shippingAddress) {
+    throw new ApiError(400, "Shipping address missing for this order");
+  }
+
+  const isPrepaid = order.paymentInfo?.status === "completed";
+
+  const shipment = {
+    order: order._id.toString(),
+    waybill: "",
+    products_desc: "E-commerce Order",
+    payment_mode: isPrepaid ? "Prepaid" : "COD",
+    total_amount: order.totalAmount,
+    cod_amount: isPrepaid ? 0 : order.totalAmount,
+    add: order.shippingAddress.address,
+    city: order.shippingAddress.city,
+    state: order.shippingAddress.state,
+    country: order.shippingAddress.country || "India",
+    pincode: order.shippingAddress.pincode,
+    phone: order.customerId.phone,
+    name: `${order.customerId.firstName} ${order.customerId.lastName}`,
+  };
+
+  const pickup_location = {
+    name: process.env.PICKUP_NAME,
+    add: process.env.PICKUP_ADDRESS,
+    city: process.env.PICKUP_CITY,
+    state: process.env.PICKUP_STATE,
+    country: "India",
+    pin: process.env.PICKUP_PINCODE,
+    phone: process.env.PICKUP_PHONE,
+  };
+
+  if (!pickup_location.name || !pickup_location.pin) {
+    throw new ApiError(500, "Pickup location is not configured properly");
+  }
+
+  const dataPayload = {
+    shipments: [shipment],
+    pickup_location,
+  };
+
+  const params = new URLSearchParams();
+  params.append("format", "json");
+  params.append("data", JSON.stringify(dataPayload));
+
+  const response = await axios.post(
+    `${DELHIVERY_BASE_URL}/api/cmu/create.json`,
+    params.toString(),
+    {
+      headers: {
+        ...getDelhiveryHeaders(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    }
+  );
+
+  const dlvData = response.data;
+
+  const waybill =
+    dlvData?.packages?.[0]?.waybill || dlvData?.success?.[0]?.waybill || null;
+
+  if (!waybill) {
+    console.error("Delhivery response (no waybill):", dlvData);
+    throw new ApiError(500, "Waybill not returned by Delhivery");
+  }
+
+  order.waybill = waybill;
+  order.courier = "delhivery";
+  order.status = "shipped";
+  await order.save();
+
+  return res.json(
+    new ApiResponse(200, "Shipment created successfully", {
+      order,
+      waybill,
+      delhivery: dlvData,
+    })
+  );
 });

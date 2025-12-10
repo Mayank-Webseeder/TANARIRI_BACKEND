@@ -178,6 +178,14 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 7,
     },
+    courier: {
+      type: String,
+      default: null,
+    },
+    waybill: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
@@ -188,7 +196,7 @@ const orderSchema = new mongoose.Schema(
 orderSchema.virtual("canReturn").get(function () {
   if (!this.isReturnable || this.status !== "delivered") return false;
 
-  const deliveryDate = this.updatedAt; 
+  const deliveryDate = this.updatedAt;
   const currentDate = new Date();
   const daysSinceDelivery = Math.floor(
     (currentDate - deliveryDate) / (1000 * 60 * 60 * 24)

@@ -138,6 +138,7 @@ export const orderSchema = Joi.object({
     state: Joi.string().required(),
     country: Joi.string().required(),
   }).required(),
+  paymentMethod: Joi.string().valid("online", "cod").required(),
   paymentInfo: Joi.object({
     razorpayOrderId: Joi.string(),
     razorpayPaymentId: Joi.string(),
