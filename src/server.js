@@ -3,6 +3,7 @@ import http from "http";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import fs from "fs";
 import rateLimit from "express-rate-limit";
 import swaggerUi from "swagger-ui-express";
 import path from "path"; // Multer static
@@ -23,6 +24,7 @@ import razorpayRoutes from "./routes/razorpayRoutes.js";
 import orderRoutes from "./routes/orderRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import shippingRoutes from "./routes/shippingRoutes.js";
+import helpRoutes from "./routes/helpRoutes.js";
 
 const app = express();
 
@@ -125,7 +127,11 @@ app.use(
   },
   express.static(path.resolve("uploads"))
 );
-
+const helpUploadsDir = path.resolve("uploads/help");
+if (!fs.existsSync(helpUploadsDir)) {
+  fs.mkdirSync(helpUploadsDir, { recursive: true });
+  console.log("Created uploads/help directory".black.bgGreen);
+}
 // API ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -136,7 +142,7 @@ app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/shipping", shippingRoutes);
-
+app.use("/api/help", helpRoutes);
 // 404 Not Found
 app.use("*", (req, res) => {
   res.status(404).json({
@@ -173,7 +179,9 @@ initializeSocket(server);
 
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`.black.bgCyan);
-  console.log(`API Documentation: http://localhost:${PORT}/api-docs`.black.bgYellow);
+  console.log(
+    `API Documentation: http://localhost:${PORT}/api-docs`.black.bgYellow
+  );
   console.log(`WebSocket Server initialized on port ${PORT}`.black.bgGreen);
 });
 
