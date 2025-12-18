@@ -6,6 +6,8 @@ import {
   deleteUser,
   getAllUsers,
   getUserById,
+  deleteAddress,
+  updateAddress,
 } from "../controllers/userController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -90,6 +92,19 @@ router.delete(
   authenticate,
   authorize("userpannel", "admin"),
   deleteUser
+);
+router.put(
+  "/:id/addresses/:addressIndex",
+  authenticate,
+  authorize("customer", "admin", "userpannel"),
+  updateAddress
+);
+
+router.delete(
+  "/:id/addresses/:addressIndex",
+  authenticate,
+  authorize("customer", "admin", "userpannel"),
+  deleteAddress
 );
 
 export default router;

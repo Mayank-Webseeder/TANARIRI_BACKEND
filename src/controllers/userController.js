@@ -124,3 +124,66 @@ export const getUserById = asyncHandler(async (req, res) => {
 
   res.json(new ApiResponse(200, 'User retrieved successfully', user));
 });
+
+export const updateAddress = asyncHandler(async (req, res) => {
+  const { id, addressIndex } = req.params;
+  const { address, pincode, city, state, country } = req.body;
+
+  // Customer can only update their own addresses
+  if (req.user.role === 'customer' && req.user._id.toString() !== id) {
+    throw new ApiError(403, 'You can only update your own addresses');
+  }
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  if (!user.addresses || !user.addresses[addressIndex]) {
+    throw new ApiError(404, 'Address not found');
+  }
+
+  // Update address
+  user.addresses[addressIndex] = {
+    address: address || user.addresses[addressIndex].address,
+    pincode: pincode || user.addresses[addressIndex].pincode,
+    city: city || user.addresses[addressIndex].city,
+    state: state || user.addresses[addressIndex].state,
+    country: country || user.addresses[addressIndex].country,
+  };
+
+  await user.save();
+
+  const userResponse = user.toObject();
+  delete userResponse.password;
+
+  res.json(new ApiResponse(200, 'Address updated successfully', userResponse));
+});
+
+export const deleteAddress = asyncHandler(async (req, res) => {
+  const { id, addressIndex } = req.params;
+
+  // Customer can only delete their own addresses
+  if (req.user.role === 'customer' && req.user._id.toString() !== id) {
+    throw new ApiError(403, 'You can only delete your own addresses');
+  }
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new ApiError(404, 'User not found');
+  }
+
+  if (!user.addresses || !user.addresses[addressIndex]) {
+    throw new ApiError(404, 'Address not found');
+  }
+
+  // Remove address
+  user.addresses.splice(addressIndex, 1);
+  
+  await user.save();
+
+  const userResponse = user.toObject();
+  delete userResponse.password;
+
+  res.json(new ApiResponse(200, 'Address deleted successfully', userResponse));
+});
