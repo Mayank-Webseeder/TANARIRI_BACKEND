@@ -51,6 +51,7 @@ const allowedOrigins = [
   "https://tanariri-dashboard.netlify.app",
   "https://tanariri-website.netlify.app",
   "https://api.tanaririllp.com",
+  "https://www.tanaririllp.com",
 ];
 
 app.use(
