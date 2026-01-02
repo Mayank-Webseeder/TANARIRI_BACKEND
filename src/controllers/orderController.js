@@ -386,9 +386,9 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     doc
       .fontSize(10)
       .text(
-        `${index + 1}. ${item.name} - Qty: ${item.quantity} x Rs.${
-          item.price
-        } = Rs.${item.subtotal}`
+        `${index + 1}. ${item.name} - Qty: ${item.quantity} x Rs.${(
+          item.price / 100
+        ).toFixed(2)} = Rs.${(item.subtotal / 100).toFixed(2)}`
       );
   });
 
@@ -396,7 +396,6 @@ export const generateInvoice = asyncHandler(async (req, res) => {
   doc
     .fontSize(14)
     .text(`Total Amount: Rs.${order.totalAmount}`, { align: "right" });
-
   doc.end();
 });
 
