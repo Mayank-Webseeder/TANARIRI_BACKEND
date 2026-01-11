@@ -795,22 +795,7 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
 
   const isPrepaid = order.paymentInfo?.status === "completed";
 
-  const shipment = {
-    order: order._id.toString(),
-    waybill: "",
-    products_desc: "E-commerce Order",
-    payment_mode: isPrepaid ? "Prepaid" : "COD",
-    total_amount: order.totalAmount,
-    cod_amount: isPrepaid ? 0 : order.totalAmount,
-    add: order.shippingAddress.address,
-    city: order.shippingAddress.city,
-    state: order.shippingAddress.state,
-    country: order.shippingAddress.country || "India",
-    pincode: order.shippingAddress.pincode,
-    phone: order.customerId.phone,
-    name: `${order.customerId.firstName} ${order.customerId.lastName}`,
-  };
-
+  // Pickup location validation
   const pickup_location = {
     name: process.env.PICKUP_NAME,
     add: process.env.PICKUP_ADDRESS,
@@ -818,7 +803,7 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
     state: process.env.PICKUP_STATE,
     country: "India",
     pin: process.env.PICKUP_PINCODE,
-    phone: process.env.PICKUP_PHONE,
+    phone: `+91${process.env.PICKUP_PHONE}`,
   };
 
   if (!pickup_location.name || !pickup_location.pin) {
@@ -826,13 +811,33 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
   }
 
   const dataPayload = {
-    shipments: [shipment],
+    shipments: [
+      {
+        order: `${order._id.toString()}_${Date.now()}`, 
+        waybill: "",
+        add: order.shippingAddress.address,
+        name: `${order.customerId.firstName} ${order.customerId.lastName}`,
+        phone: `+91${order.customerId.phone}`,
+        pin: order.shippingAddress.pincode, 
+        order_date: new Date().toISOString(),
+        payment_mode: isPrepaid ? "Prepaid" : "Pickup/COD",
+        cod_amount: isPrepaid ? 0 : order.totalAmount,
+        shipping_mode: "Express",
+        products_desc: "E-commerce Order",
+        quantity: "1",
+        total_weight: "0.5", // Required
+        declared_value: order.totalAmount.toString(), 
+      },
+    ],
     pickup_location,
   };
 
   const params = new URLSearchParams();
   params.append("format", "json");
   params.append("data", JSON.stringify(dataPayload));
+
+  console.log("=== Delhivery Request Payload ===");
+  console.log(JSON.stringify(dataPayload, null, 2));
 
   const response = await axios.post(
     `${DELHIVERY_BASE_URL}/api/cmu/create.json`,
@@ -846,15 +851,24 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
   );
 
   const dlvData = response.data;
+  console.log("=== Delhivery Response ===");
+  console.log(JSON.stringify(dlvData, null, 2));
 
-  const waybill =
-    dlvData?.packages?.[0]?.waybill || dlvData?.success?.[0]?.waybill || null;
+  const waybill = dlvData?.packages?.[0]?.waybill || null;
 
   if (!waybill) {
+    const remarksText = Array.isArray(dlvData?.packages?.[0]?.remarks)
+      ? dlvData.packages[0].remarks.join(" | ")
+      : dlvData?.rmk || "No remarks provided";
+
     console.error("Delhivery response (no waybill):", dlvData);
-    throw new ApiError(500, "Waybill not returned by Delhivery");
+    throw new ApiError(
+      502,
+      `Delhivery failed to create shipment. Remarks: ${remarksText}`
+    );
   }
 
+  // Save order
   order.waybill = waybill;
   order.courier = "delhivery";
   order.status = "shipped";
@@ -868,3 +882,4 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
     })
   );
 });
+
