@@ -86,61 +86,140 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 });
 
+// export const createOrderByCustomer = asyncHandler(async (req, res) => {
+//   const { items, totalAmount, shippingAddress } = req.body;
+//   const customerId = req.user._id;
+
+//   const session = await mongoose.startSession();
+//   session.startTransaction();
+
+//   try {
+//     for (const item of items) {
+//       const product = await Product.findById(item.productId).session(session);
+
+//       if (!product) {
+//         throw new ApiError(404, `Product not found: ${item.productId}`);
+//       }
+
+//       if (product.stock < item.quantity) {
+//         throw new ApiError(
+//           400,
+//           `Insufficient stock for product: ${product.productName}`
+//         );
+//       }
+
+//       product.stock -= item.quantity;
+//       await product.save({ session });
+//     }
+
+//     const razorpayOrder = await createRazorpayOrder(
+//       totalAmount,
+//       "INR",
+//       `order_${Date.now()}`
+//     );
+
+//     const order = await Order.create(
+//       [
+//         {
+//           customerId,
+//           items,
+//           totalAmount,
+//           shippingAddress,
+//           paymentInfo: {
+//             razorpayOrderId: razorpayOrder.id,
+//             status: "pending",
+//           },
+//         },
+//       ],
+//       { session }
+//     );
+
+//     await session.commitTransaction();
+
+//     notifyOrderCreated(order[0]);
+//     notifyAdminNewOrder(order[0], {
+//       firstName: req.user.firstName,
+//       lastName: req.user.lastName,
+//     });
+
+//     res.status(201).json(
+//       new ApiResponse(201, "Order created successfully", {
+//         order: order[0],
+//         razorpayOrder,
+//       })
+//     );
+//   } catch (error) {
+//     await session.abortTransaction();
+//     throw error;
+//   } finally {
+//     session.endSession();
+//   }
+// });
+
 export const createOrderByCustomer = asyncHandler(async (req, res) => {
-  const { items, totalAmount, shippingAddress } = req.body;
+  const { items, shippingAddress } = req.body;
   const customerId = req.user._id;
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    let calculatedTotal = 0;
+    const finalItems = [];
+
     for (const item of items) {
       const product = await Product.findById(item.productId).session(session);
 
       if (!product) {
-        throw new ApiError(404, `Product not found: ${item.productId}`);
+        throw new ApiError(404, "Product not found");
       }
 
       if (product.stock < item.quantity) {
-        throw new ApiError(
-          400,
-          `Insufficient stock for product: ${product.productName}`
-        );
+        throw new ApiError(400, "Insufficient stock");
       }
+
+      const price = product.discountPrice; // ₹200 (STORE RUPEES)
+      const subtotal = price * item.quantity;
+
+      finalItems.push({
+        productId: product._id,
+        name: product.productName,
+        price,        // ₹200
+        quantity: item.quantity,
+        subtotal,     // ₹400
+      });
+
+      calculatedTotal += subtotal;
 
       product.stock -= item.quantity;
       await product.save({ session });
     }
 
+    // shipping ₹20 example
+    calculatedTotal += 20;
+
+    // ✅ ONLY HERE convert to paise
     const razorpayOrder = await createRazorpayOrder(
-      totalAmount,
+      calculatedTotal * 100, // paise
       "INR",
       `order_${Date.now()}`
     );
 
     const order = await Order.create(
-      [
-        {
-          customerId,
-          items,
-          totalAmount,
-          shippingAddress,
-          paymentInfo: {
-            razorpayOrderId: razorpayOrder.id,
-            status: "pending",
-          },
+      [{
+        customerId,
+        items: finalItems,
+        totalAmount: calculatedTotal, // ₹420
+        shippingAddress,
+        paymentInfo: {
+          razorpayOrderId: razorpayOrder.id,
+          status: "pending",
         },
-      ],
+      }],
       { session }
     );
 
     await session.commitTransaction();
-
-    notifyOrderCreated(order[0]);
-    notifyAdminNewOrder(order[0], {
-      firstName: req.user.firstName,
-      lastName: req.user.lastName,
-    });
 
     res.status(201).json(
       new ApiResponse(201, "Order created successfully", {
@@ -148,9 +227,9 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
         razorpayOrder,
       })
     );
-  } catch (error) {
+  } catch (err) {
     await session.abortTransaction();
-    throw error;
+    throw err;
   } finally {
     session.endSession();
   }
