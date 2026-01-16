@@ -146,40 +146,21 @@ export const orderSchema = Joi.object({
     status: Joi.string().valid("pending", "completed", "failed"),
   }),
 });
-// export const customerOrderSchema = Joi.object({
-//   items: Joi.array()
-//     .items(
-//       Joi.object({
-//         productId: Joi.string().required(),
-//         name: Joi.string().required(),
-//         price: Joi.number().min(0).required(),
-//         quantity: Joi.number().min(1).required(),
-//         subtotal: Joi.number().min(0).required(),
-//       })
-//     )
-//     .min(1)
-//     .required(),
-//   totalAmount: Joi.number().min(0).required(),
-//   shippingAddress: Joi.object({
-//     address: Joi.string().required(),
-//     pincode: Joi.string().required(),
-//     city: Joi.string().required(),
-//     state: Joi.string().required(),
-//     country: Joi.string().required(),
-//   }).required(),
-// });
 
 export const customerOrderSchema = Joi.object({
   items: Joi.array()
     .items(
       Joi.object({
-        productId: Joi.string().hex().length(24).required(),
-        quantity: Joi.number().integer().min(1).required(),
+        productId: Joi.string().required(),
+        name: Joi.string().required(),
+        price: Joi.number().min(0).required(),
+        quantity: Joi.number().min(1).required(),
+        subtotal: Joi.number().min(0).required(),
       })
     )
     .min(1)
     .required(),
-
+  totalAmount: Joi.number().min(0).required(),
   shippingAddress: Joi.object({
     address: Joi.string().required(),
     pincode: Joi.string().required(),
@@ -188,4 +169,24 @@ export const customerOrderSchema = Joi.object({
     country: Joi.string().required(),
   }).required(),
 });
+
+// export const customerOrderSchema = Joi.object({
+//   items: Joi.array()
+//     .items(
+//       Joi.object({
+//         productId: Joi.string().hex().length(24).required(),
+//         quantity: Joi.number().integer().min(1).required(),
+//       })
+//     )
+//     .min(1)
+//     .required(),
+
+//   shippingAddress: Joi.object({
+//     address: Joi.string().required(),
+//     pincode: Joi.string().required(),
+//     city: Joi.string().required(),
+//     state: Joi.string().required(),
+//     country: Joi.string().required(),
+//   }).required(),
+// });
 
