@@ -26,8 +26,14 @@ const orderItemSchema = new mongoose.Schema(
       required: true,
       min: 0,
     },
+    shippingAmount: {
+      type: Number,
+      required: true,
+      min: 0,
+      default: 0,
+    },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const paymentInfoSchema = new mongoose.Schema(
@@ -41,7 +47,7 @@ const paymentInfoSchema = new mongoose.Schema(
       default: "pending",
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const shippingAddressSchema = new mongoose.Schema(
@@ -52,7 +58,7 @@ const shippingAddressSchema = new mongoose.Schema(
     state: { type: String, required: true },
     country: { type: String, required: true },
   },
-  { _id: false }
+  { _id: false },
 );
 
 // Return Request Schema
@@ -117,7 +123,7 @@ const returnRequestSchema = new mongoose.Schema(
       default: "not_initiated",
     },
   },
-  { _id: false }
+  { _id: false },
 );
 
 const orderSchema = new mongoose.Schema(
@@ -152,12 +158,14 @@ const orderSchema = new mongoose.Schema(
         "pending",
         "confirmed",
         "shipped",
+        "in_transit",
         "delivered",
         "cancelled",
         "refunded",
         "return_requested",
         "return_approved",
         "return_rejected",
+        "return_received",
         "return_completed",
       ],
       default: "pending",
@@ -186,10 +194,22 @@ const orderSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    trackingStatus: {
+      type: String,
+      default: null,
+    },
+    returnWaybill: {
+      type: String,
+      default: null,
+    },
+    returnTrackingStatus: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Virtual to check if return window is still open
@@ -199,7 +219,7 @@ orderSchema.virtual("canReturn").get(function () {
   const deliveryDate = this.updatedAt;
   const currentDate = new Date();
   const daysSinceDelivery = Math.floor(
-    (currentDate - deliveryDate) / (1000 * 60 * 60 * 24)
+    (currentDate - deliveryDate) / (1000 * 60 * 60 * 24),
   );
 
   return daysSinceDelivery <= this.returnWindowDays;
@@ -208,6 +228,8 @@ orderSchema.virtual("canReturn").get(function () {
 // Index for faster queries
 orderSchema.index({ customerId: 1, status: 1 });
 orderSchema.index({ "returnRequest.requestStatus": 1 });
+orderSchema.index({ waybill: 1 });
+orderSchema.index({ returnWaybill: 1 });
 
 const Order = mongoose.model("Order", orderSchema);
 

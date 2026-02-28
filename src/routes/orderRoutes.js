@@ -20,6 +20,16 @@ import {
   cancelReturnRequest,
   cancelOrderByCustomer,
   shipOrderWithDelhivery,
+  publicTrackShipment,
+  trackDelhiveryShipment,
+  scheduleOrderPickup,
+  downloadShippingLabel,
+  cancelShipment,
+  generateDailyManifest,
+  bulkDownloadShippingLabels,
+  getAllShipments,
+  getAllReverseShipments,
+  delhiveryWebhook,
 } from "../controllers/orderController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -37,7 +47,7 @@ router.post(
   authenticate,
   authorize("admin", "userpannel"),
   validate(orderSchema),
-  createOrder
+  createOrder,
 );
 
 router.post(
@@ -45,56 +55,56 @@ router.post(
   authenticate,
   authorize("customer"),
   validate(customerOrderSchema),
-  createOrderByCustomer
+  createOrderByCustomer,
 );
 
 router.post(
   "/:id/cancel-by-customer",
   authenticate,
   authorize("customer"),
-  cancelOrderByCustomer
+  cancelOrderByCustomer,
 );
 
 router.get(
   "/getAllOrders",
   authenticate,
   authorize("admin", "userpannel"),
-  getAllOrders
+  getAllOrders,
 );
 
 router.get(
   "/summary",
   authenticate,
   authorize("admin", "userpannel"),
-  getOrderSummary
+  getOrderSummary,
 );
 
 router.get(
   "/customer",
   authenticate,
   authorize("customer"),
-  getAllCustomerOrdersSummary
+  getAllCustomerOrdersSummary,
 );
 
 router.get(
   "/getOrdersByCustomerId/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  getOrdersByCustomerId
+  getOrdersByCustomerId,
 );
 
 router.get(
   "/return-requests",
   authenticate,
   authorize("admin", "userpannel"),
-  getAllReturnRequests
+  getAllReturnRequests,
 );
 
 router.get(
   "/my-return-requests",
   authenticate,
   authorize("customer"),
-  getMyReturnRequests
+  getMyReturnRequests,
 );
 
 router.post(
@@ -102,34 +112,34 @@ router.post(
   authenticate,
   authorize("customer"),
   upload.array("images", 5),
-  submitReturnRequest
+  submitReturnRequest,
 );
 router.post(
   "/:id/return-request/approve",
   authenticate,
   authorize("admin", "userpannel"),
-  approveReturnRequest
+  approveReturnRequest,
 );
 
 router.post(
   "/:id/return-request/reject",
   authenticate,
   authorize("admin", "userpannel"),
-  rejectReturnRequest
+  rejectReturnRequest,
 );
 
 router.post(
   "/:id/return-request/complete",
   authenticate,
   authorize("admin", "userpannel"),
-  completeReturnRequest
+  completeReturnRequest,
 );
 
 router.post(
   "/:id/return-request/cancel",
   authenticate,
   authorize("customer"),
-  cancelReturnRequest
+  cancelReturnRequest,
 );
 
 router.get("/getOrders/:id", authenticate, getOrderById);
@@ -140,22 +150,82 @@ router.patch(
   "/updateOrdersById/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  updateOrder
+  updateOrder,
 );
 
 router.patch(
   "/updateOrdersStatus/:id/status",
   authenticate,
   authorize("admin", "userpannel"),
-  changeOrderStatus
+  changeOrderStatus,
 );
+// Admin tracking
+router.get(
+  "/track/:waybill",
+  authenticate,
+  authorize("admin", "userpannel"),
+  trackDelhiveryShipment,
+);
+// Customer public tracking
+router.get("/public/track/:waybill", publicTrackShipment);
 
 router.post(
   "/:id/ship-with-delhivery",
   authenticate,
   authorize("admin", "userpannel"),
-  shipOrderWithDelhivery
+  shipOrderWithDelhivery,
 );
+
+router.post(
+  "/:id/cancel-shipment",
+  authenticate,
+  authorize("admin", "userpannel"),
+  cancelShipment,
+);
+
+router.get(
+  "/:id/shipping-label",
+  authenticate,
+  authorize("admin", "userpannel"),
+  downloadShippingLabel,
+);
+
+router.post(
+  "/:id/schedule-pickup",
+  authenticate,
+  authorize("admin", "userpannel"),
+  scheduleOrderPickup,
+);
+
+router.get(
+  "/admin/manifest",
+  authenticate,
+  authorize("admin", "userpannel"),
+  generateDailyManifest,
+);
+
+router.post(
+  "/admin/bulk-labels",
+  authenticate,
+  authorize("admin", "userpannel"),
+  bulkDownloadShippingLabels,
+);
+
+router.get(
+  "/admin/shipments",
+  authenticate,
+  authorize("admin", "userpannel"),
+  getAllShipments,
+);
+
+router.get(
+  "/admin/reverse-shipments",
+  authenticate,
+  authorize("admin", "userpannel"),
+  getAllReverseShipments,
+);
+
+router.post("/webhook/delhivery", delhiveryWebhook);
 router.delete("/:id", authenticate, authorize("admin"), deleteOrder);
 
 export default router;
