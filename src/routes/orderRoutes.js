@@ -30,6 +30,7 @@ import {
   getAllShipments,
   getAllReverseShipments,
   delhiveryWebhook,
+  delhiveryRemittanceWebhook,
 } from "../controllers/orderController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -226,6 +227,9 @@ router.get(
 );
 
 router.post("/webhook/delhivery", delhiveryWebhook);
+
+router.post("/webhook/delhivery/remittance", delhiveryRemittanceWebhook);
+
 router.delete("/:id", authenticate, authorize("admin"), deleteOrder);
 
 export default router;

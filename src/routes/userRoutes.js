@@ -8,6 +8,7 @@ import {
   getUserById,
   deleteAddress,
   updateAddress,
+  updateBankDetails,
 } from "../controllers/userController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -107,4 +108,10 @@ router.delete(
   deleteAddress
 );
 
+router.put(
+  "/:id/bank-details",
+  authenticate,
+  authorize("customer", "admin", "userpannel"),
+  updateBankDetails,
+);
 export default router;

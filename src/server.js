@@ -15,6 +15,9 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 import { swaggerSpec } from "./docs/swagger.js";
 import { initializeSocket } from "./config/socket.js";
 
+// Cron setup
+import "./utils/cronJobs.js";
+
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import categoryRoutes from "./routes/categoryRoutes.js";

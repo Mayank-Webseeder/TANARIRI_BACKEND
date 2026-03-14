@@ -72,10 +72,18 @@ export const updateUserSchema = Joi.object({
       city: Joi.string().required(),
       state: Joi.string().required(),
       country: Joi.string().required(),
-    })
+    }),
   ),
   modules: Joi.array().items(Joi.string()),
   isActive: Joi.boolean(),
+  // NEW: Bank Details validation
+  bankDetails: Joi.object({
+    accountHolderName: Joi.string().trim().required(),
+    accountNumber: Joi.string().trim().required(),
+    ifscCode: Joi.string().trim().required(),
+    bankName: Joi.string().trim().required(),
+    branchName: Joi.string().trim().allow("", null).optional(),
+  }).optional(),
 });
 
 export const categorySchema = Joi.object({

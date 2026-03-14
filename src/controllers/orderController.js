@@ -16,6 +16,7 @@ import {
   notifyReturnRequestRejected,
   notifyReturnCompleted,
 } from "../services/orderNotificationService.js";
+import { sendManualRefundAlert } from "../services/emailService.js";
 import axios from "axios";
 import bwipjs from "bwip-js";
 import fs from "fs";
@@ -654,7 +655,7 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "No forward shipment for return");
   }
 
-  // Delhivery Return Shipment
+  // Delhivery Return Shipment Payload
   const returnPayload = {
     cod_amount: 0,
     shipments: [
@@ -715,6 +716,7 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
     );
   }
 
+  // Update Return Request Data
   order.returnRequest.requestStatus = "approved";
   order.returnRequest.reviewedBy = adminId;
   order.returnRequest.reviewedAt = new Date();
@@ -724,6 +726,18 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
   order.status = "return_approved";
 
   await order.save();
+
+  // Check for COD / Manual Refund requirement at approval stage
+  const isOnlinePayment =
+    order.paymentInfo?.status === "completed" &&
+    order.paymentInfo?.razorpayPaymentId;
+
+  if (!isOnlinePayment) {
+    // Trigger alert immediately so admin can prepare for manual payout
+    sendManualRefundAlert(order).catch((err) =>
+      console.error("Admin Notification Error:", err),
+    );
+  }
 
   res.json(
     new ApiResponse(200, "Return approved & shipment created", {
@@ -796,6 +810,7 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Only approved return requests can be completed");
     }
 
+    // 1. Stock Update Logic
     for (const item of order.items) {
       const product = await Product.findById(item.productId._id).session(
         session,
@@ -806,8 +821,36 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
       }
     }
 
+    // 2. Razorpay Refund Logic
+    let refund = null;
+    if (
+      order.paymentInfo &&
+      order.paymentInfo.status === "completed" &&
+      order.paymentInfo.razorpayPaymentId
+    ) {
+      const amountInPaise = Math.round(
+        (order.returnRequest.refundAmount || order.totalAmount) * 100,
+      );
+
+      refund = await razorpay.payments.refund(
+        order.paymentInfo.razorpayPaymentId,
+        {
+          amount: amountInPaise,
+          speed: "normal",
+          notes: {
+            order_id: order._id.toString(),
+            reason: "Return request completed and items received",
+          },
+        },
+      );
+
+      order.returnRequest.refundStatus = "completed";
+    } else {
+      order.returnRequest.refundStatus = "manual_pending";
+    }
+
+    // 3. Final Order Status Updates
     order.returnRequest.requestStatus = "completed";
-    order.returnRequest.refundStatus = "processing";
     order.status = "return_completed";
     order.paymentInfo.status = "refunded";
 
@@ -817,17 +860,24 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
 
     notifyReturnCompleted(order);
 
-    res
-      .status(200)
-      .json(
-        new ApiResponse(
-          200,
-          "Return completed and refund initiated successfully",
+    res.status(200).json(
+      new ApiResponse(
+        200,
+        "Return completed and refund processed via Razorpay",
+        {
           order,
-        ),
-      );
+          refund,
+        },
+      ),
+    );
   } catch (error) {
     await session.abortTransaction();
+    if (error.statusCode) {
+      throw new ApiError(
+        error.statusCode,
+        `Razorpay Error: ${error.description}`,
+      );
+    }
     throw error;
   } finally {
     session.endSession();
@@ -2189,4 +2239,34 @@ export const generateDailyManifest = asyncHandler(async (req, res) => {
   doc.text("Date & Time:                  _______________________", 30, doc.y);
 
   doc.end();
+});
+
+export const delhiveryRemittanceWebhook = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, message: "Webhook received" });
+
+  try {
+    const payload = req.body;
+    const waybill = payload.Waybill || payload.awb || payload.wbn;
+    const remittanceStatus = payload.Status || payload.status;
+
+    if (!waybill) return;
+
+    const order = await Order.findOne({ waybill });
+    if (!order) return;
+
+    const statusLower = remittanceStatus ? remittanceStatus.toLowerCase() : "";
+
+    // Status check
+    if (
+      statusLower.includes("settled") ||
+      statusLower.includes("remitted") ||
+      statusLower.includes("paid")
+    ) {
+      order.paymentInfo.status = "completed";
+      await order.save();
+      console.log(`Order ${waybill} completed`);
+    }
+  } catch (error) {
+    console.error(error.message);
+  }
 });

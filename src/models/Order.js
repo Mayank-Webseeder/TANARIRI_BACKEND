@@ -119,7 +119,13 @@ const returnRequestSchema = new mongoose.Schema(
     },
     refundStatus: {
       type: String,
-      enum: ["not_initiated", "processing", "completed", "failed"],
+      enum: [
+        "not_initiated",
+        "processing",
+        "completed",
+        "failed",
+        "manual_pending",
+      ],
       default: "not_initiated",
     },
   },
