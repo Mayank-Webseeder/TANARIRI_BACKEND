@@ -155,10 +155,46 @@ export const getUserById = asyncHandler(async (req, res) => {
 
 export const updateAddress = asyncHandler(async (req, res) => {
   const { id, addressIndex } = req.params;
-  const { address, pincode, city, state, country } = req.body;
+  const { address, city, state, country, pincode, postalCode, addressLine2 } =
+    req.body;
 
+  const user = await User.findById(id);
+  if (!user) throw new ApiError(404, "User not found");
+  const isIndia = country?.toLowerCase() === "india";
+  if (isIndia && !pincode) {
+    throw new ApiError(400, "Pincode is required for Indian addresses");
+  }
+  if (!isIndia && !postalCode) {
+    throw new ApiError(
+      400,
+      "Postal Code is required for international addresses",
+    );
+  }
+
+  const newAddress = {
+    address,
+    city,
+    state,
+    country,
+    pincode: isIndia ? pincode : undefined,
+    postalCode: !isIndia ? postalCode : undefined,
+    addressLine2: !isIndia ? addressLine2 : undefined,
+  };
+
+  user.addresses[addressIndex] = newAddress;
+  await user.save();
+
+  res.json(
+    new ApiResponse(200, "Address updated successfully", user.addresses),
+  );
+});
+
+export const deleteAddress = asyncHandler(async (req, res) => {
+  const { id, addressIndex } = req.params;
+
+  // Customer can only delete their own addresses
   if (req.user.role === "customer" && req.user._id.toString() !== id) {
-    throw new ApiError(403, "You can only update your own addresses");
+    throw new ApiError(403, "You can only delete your own addresses");
   }
 
   const user = await User.findById(id);
@@ -170,82 +206,51 @@ export const updateAddress = asyncHandler(async (req, res) => {
     throw new ApiError(404, "Address not found");
   }
 
-  user.addresses[addressIndex] = {
-    address: address || user.addresses[addressIndex].address,
-    pincode: pincode || user.addresses[addressIndex].pincode,
-    city: city || user.addresses[addressIndex].city,
-    state: state || user.addresses[addressIndex].state,
-    country: country || user.addresses[addressIndex].country,
-  };
-
-  await user.save();
-
-  const userResponse = user.toObject();
-  delete userResponse.password;
-
-  res.json(new ApiResponse(200, "Address updated successfully", userResponse));
-});
-
-export const deleteAddress = asyncHandler(async (req, res) => {
-  const { id, addressIndex } = req.params;
-
-  // Customer can only delete their own addresses
-  if (req.user.role === 'customer' && req.user._id.toString() !== id) {
-    throw new ApiError(403, 'You can only delete your own addresses');
-  }
-
-  const user = await User.findById(id);
-  if (!user) {
-    throw new ApiError(404, 'User not found');
-  }
-
-  if (!user.addresses || !user.addresses[addressIndex]) {
-    throw new ApiError(404, 'Address not found');
-  }
-
   // Remove address
   user.addresses.splice(addressIndex, 1);
-  
+
   await user.save();
 
   const userResponse = user.toObject();
   delete userResponse.password;
 
-  res.json(new ApiResponse(200, 'Address deleted successfully', userResponse));
+  res.json(new ApiResponse(200, "Address deleted successfully", userResponse));
 });
 
 export const updateBankDetails = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { accountHolderName, accountNumber, ifscCode, bankName, branchName } =
-    req.body;
-
-  if (req.user.role === "customer" && req.user._id.toString() !== id) {
-    throw new ApiError(403, "You can only update your own bank details");
-  }
+  const {
+    accountHolderName,
+    accountNumber,
+    bankName,
+    branchName,
+    ifscCode,
+    swiftCode,
+    iban,
+    routingNumber,
+    country,
+  } = req.body;
 
   const user = await User.findById(id);
-  if (!user) {
-    throw new ApiError(404, "User not found");
+
+  const isIndia = country?.toLowerCase() === "india";
+
+  if (isIndia && !ifscCode) {
+    throw new ApiError(400, "IFSC Code is required for Indian bank accounts");
   }
 
-  if (user.role !== "customer") {
-    throw new ApiError(400, "Bank details can only be updated for customers");
-  }
-
-  user.bankDetails = {
-    accountHolderName: accountHolderName || user.bankDetails?.accountHolderName,
-    accountNumber: accountNumber || user.bankDetails?.accountNumber,
-    ifscCode: ifscCode || user.bankDetails?.ifscCode,
-    bankName: bankName || user.bankDetails?.bankName,
-    branchName: branchName || user.bankDetails?.branchName,
-  };
+user.bankDetails = {
+  accountHolderName,
+  accountNumber,
+  bankName,
+  country: country || "India",
+  branchName: isIndia ? branchName : undefined,
+  ifscCode: isIndia ? ifscCode : undefined,
+  swiftCode: !isIndia ? swiftCode : undefined,
+  iban: !isIndia ? iban : undefined,
+  routingNumber: !isIndia ? routingNumber : undefined,
+};
 
   await user.save();
-
-  const userResponse = user.toObject();
-  delete userResponse.password;
-
-  res.json(
-    new ApiResponse(200, "Bank details updated successfully", userResponse),
-  );
+  res.json(new ApiResponse(200, "Bank details updated", user.bankDetails));
 });

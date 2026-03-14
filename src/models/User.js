@@ -3,11 +3,14 @@ import bcrypt from "bcrypt";
 
 const addressSchema = new mongoose.Schema(
   {
-    address: { type: String, required: true },
-    pincode: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    country: { type: String, required: true },
+    address: { type: String, required: true, trim: true },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    country: { type: String, required: true, trim: true },
+    pincode: { type: String, trim: true },
+    postalCode: { type: String, trim: true },
+    addressLine2: { type: String, trim: true },
+    region: { type: String, trim: true },
   },
   { _id: false },
 );
@@ -16,9 +19,13 @@ const bankDetailsSchema = new mongoose.Schema(
   {
     accountHolderName: { type: String, required: true, trim: true },
     accountNumber: { type: String, required: true, trim: true },
-    ifscCode: { type: String, required: true, trim: true },
     bankName: { type: String, required: true, trim: true },
+    ifscCode: { type: String, trim: true },
     branchName: { type: String, trim: true },
+    swiftCode: { type: String, trim: true },
+    iban: { type: String, trim: true },
+    routingNumber: { type: String },
+    country: { type: String },
   },
   { _id: false },
 );
@@ -42,7 +49,7 @@ const userSchema = new mongoose.Schema(
     },
     isActive: { type: Boolean, default: true },
     phone: { type: String, sparse: true, unique: true },
-    addresses: { type: [addressSchema], default: undefined },
+    addresses: { type: [addressSchema], default: [] }, 
     modules: { type: [String], default: undefined },
     bankDetails: { type: bankDetailsSchema, default: undefined },
   },
