@@ -1,9 +1,11 @@
 import Product from "../models/Product.js";
+import Order from "../models/Order.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import fs from "fs";
 import path from "path";
+import User from "../models/User.js";
 
 export const createProduct = asyncHandler(async (req, res) => {
   const imageAssets = req.body.processedImages || [];
@@ -316,4 +318,81 @@ export const updateStock = asyncHandler(async (req, res) => {
   await product.save();
 
   res.json(new ApiResponse(200, "Stock updated successfully", product));
+});
+
+export const addProductReview = asyncHandler(async (req, res) => {
+  const { rating, comment } = req.body;
+  const productId = req.params.id;
+  const userId = req.user._id;
+
+  const hasPurchased = await Order.findOne({
+    customerId: userId,
+    status: "delivered",
+    "items.productId": productId,
+  });
+
+  if (!hasPurchased) {
+    throw new ApiError(403, "You can only review items delivered to you.");
+  }
+
+  const user = await User.findById(userId).select("firstName lastName");
+  const fullName = user
+    ? `${user.firstName} ${user.lastName}`
+    : "Anonymous Buyer";
+
+  const product = await Product.findById(productId);
+  if (!product) throw new ApiError(404, "Product not found");
+
+  const alreadyReviewed = product.reviews.find(
+    (r) => r.user.toString() === userId.toString(),
+  );
+
+  if (alreadyReviewed) {
+    alreadyReviewed.rating = Number(rating);
+    alreadyReviewed.comment = comment;
+    alreadyReviewed.name = fullName;
+  } else {
+    const review = {
+      user: userId,
+      name: fullName,
+      rating: Number(rating),
+      comment,
+    };
+    product.reviews.push(review);
+    product.numReviews = product.reviews.length;
+  }
+
+  // Calculate average rating
+  product.avgRating =
+    product.reviews.reduce((acc, item) => item.rating + acc, 0) /
+    product.reviews.length;
+
+  await product.save();
+
+  res
+    .status(201)
+    .json(
+      new ApiResponse(201, "Review submitted successfully", product.reviews),
+    );
+});
+
+// Delete Review
+export const deleteProductReview = asyncHandler(async (req, res) => {
+  const product = await Product.findById(req.params.id);
+
+  if (!product) throw new ApiError(404, "Product not found");
+
+  const reviews = product.reviews.filter(
+    (r) => r.user.toString() !== req.user._id.toString(),
+  );
+
+  product.reviews = reviews;
+  product.numReviews = reviews.length;
+  product.avgRating =
+    reviews.length > 0
+      ? reviews.reduce((acc, item) => item.rating + acc, 0) / reviews.length
+      : 0;
+
+  await product.save();
+  res.json(new ApiResponse(200, "Review removed", null));
 });

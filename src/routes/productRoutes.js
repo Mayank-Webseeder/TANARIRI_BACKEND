@@ -11,6 +11,8 @@ import {
   toggleBestSeller,
   toggleHideProduct,
   updateStock,
+  addProductReview,
+  deleteProductReview,
 } from "../controllers/productController.js";
 import { authenticate } from "../middlewares/authenticate.js";
 import { authorize } from "../middlewares/authorize.js";
@@ -113,4 +115,7 @@ router.post(
   updateStock,
 );
 
+router.post("/:id/reviews", authenticate, addProductReview);
+
+router.delete("/:id/reviews", authenticate, deleteProductReview);
 export default router;
