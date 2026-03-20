@@ -17,6 +17,10 @@ import { authorize } from "../middlewares/authorize.js";
 import { validate } from "../middlewares/validate.js";
 import { productSchema } from "../utils/validationSchemas.js";
 import { upload } from "../middlewares/multer.js";
+import {
+  processProductImages,
+  uploadImages,
+} from "../middlewares/imageProcessor.js";
 
 const router = express.Router();
 
@@ -58,52 +62,55 @@ const router = express.Router();
 // create product
 router.post(
   "/createproduct",
-  upload.array("productImages", 5),
   authenticate,
   authorize("admin", "userpannel"),
+  uploadImages.array("productImages", 5),
+  processProductImages,
   validate(productSchema),
-  createProduct
+  createProduct,
 );
+
 router.get("/getallproducts", getAllProducts);
 router.get("/getactiveproducts", getActiveProducts);
 router.get("/getbestsellerproducts", getBestSellerProducts);
 router.get("/getproductbyid/:id", getProductById);
 router.put(
   "/updateproduct/:id",
-  upload.array("productImages", 5),
   authenticate,
   authorize("admin", "userpannel"),
-  updateProduct
+  uploadImages.array("productImages", 5),
+  processProductImages,
+  updateProduct,
 );
 router.delete(
   "/deleteproduct/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  deleteProduct
+  deleteProduct,
 );
 router.patch(
   "/togglestatus/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  toggleProductStatus
+  toggleProductStatus,
 );
 router.patch(
   "/togglebestseller/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  toggleBestSeller
+  toggleBestSeller,
 );
 router.patch(
   "/togglehide/:id",
   authenticate,
   authorize("admin", "userpannel"),
-  toggleHideProduct
+  toggleHideProduct,
 );
 router.post(
   "/:id/stock",
   authenticate,
   authorize("admin", "userpannel"),
-  updateStock
+  updateStock,
 );
 
 export default router;

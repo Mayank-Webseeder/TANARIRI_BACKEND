@@ -50,18 +50,21 @@ const paymentInfoSchema = new mongoose.Schema(
   { _id: false },
 );
 
+// UPDATED: Completely replaced with flexible address schema
 const shippingAddressSchema = new mongoose.Schema(
   {
-    address: { type: String, required: true },
-    pincode: { type: String, required: true },
-    city: { type: String, required: true },
-    state: { type: String, required: true },
-    country: { type: String, required: true },
+    address: { type: String, required: true, trim: true },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    country: { type: String, required: true, trim: true },
+    pincode: { type: String, trim: true }, // India
+    postalCode: { type: String, trim: true }, // International
+    addressLine2: { type: String, trim: true }, // Optional apartment/suite
+    region: { type: String, trim: true }, // Optional state/province abbreviation
   },
   { _id: false },
 );
 
-// Return Request Schema
 const returnRequestSchema = new mongoose.Schema(
   {
     requestedBy: {
@@ -153,6 +156,12 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
+    },
+    // Track currency so admin knows if amount is USD or INR
+    currency: {
+      type: String,
+      default: "INR",
+      trim: true,
     },
     paymentInfo: {
       type: paymentInfoSchema,

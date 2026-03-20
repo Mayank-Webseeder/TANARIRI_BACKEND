@@ -1,20 +1,35 @@
 import Joi from "joi";
 
+const addressValidation = Joi.object({
+  address: Joi.string().required(),
+  city: Joi.string().required(),
+  state: Joi.string().required(),
+  country: Joi.string().required(),
+  pincode: Joi.string().allow("", null).optional(),
+  postalCode: Joi.string().allow("", null).optional(),
+  addressLine2: Joi.string().allow("", null).optional(),
+  region: Joi.string().allow("", null).optional(),
+});
+
+const bankDetailsValidation = Joi.object({
+  accountHolderName: Joi.string().trim().required(),
+  accountNumber: Joi.string().trim().required(),
+  bankName: Joi.string().trim().required(),
+  country: Joi.string().trim().allow("", null).optional(),
+  ifscCode: Joi.string().trim().allow("", null).optional(),
+  branchName: Joi.string().trim().allow("", null).optional(),
+  swiftCode: Joi.string().trim().allow("", null).optional(),
+  routingNumber: Joi.string().trim().allow("", null).optional(),
+  iban: Joi.string().trim().allow("", null).optional(),
+});
+
 export const signupSchema = Joi.object({
   firstName: Joi.string().required().trim(),
   lastName: Joi.string().required().trim(),
   email: Joi.string().email().required(),
   password: Joi.string().min(6).required(),
   phone: Joi.string().required(),
-  addresses: Joi.array().items(
-    Joi.object({
-      address: Joi.string().required(),
-      pincode: Joi.string().required(),
-      city: Joi.string().required(),
-      state: Joi.string().required(),
-      country: Joi.string().required(),
-    })
-  ),
+  addresses: Joi.array().items(addressValidation),
 });
 
 export const loginSchema = Joi.object({
@@ -47,15 +62,7 @@ export const createUserSchema = Joi.object({
     then: Joi.required(),
     otherwise: Joi.optional(),
   }),
-  addresses: Joi.array().items(
-    Joi.object({
-      address: Joi.string().required(),
-      pincode: Joi.string().required(),
-      city: Joi.string().required(),
-      state: Joi.string().required(),
-      country: Joi.string().required(),
-    })
-  ),
+  addresses: Joi.array().items(addressValidation),
   modules: Joi.array().items(Joi.string()),
   isActive: Joi.boolean(),
 });
@@ -65,25 +72,10 @@ export const updateUserSchema = Joi.object({
   lastName: Joi.string().trim(),
   email: Joi.string().email(),
   phone: Joi.string(),
-  addresses: Joi.array().items(
-    Joi.object({
-      address: Joi.string().required(),
-      pincode: Joi.string().required(),
-      city: Joi.string().required(),
-      state: Joi.string().required(),
-      country: Joi.string().required(),
-    }),
-  ),
+  addresses: Joi.array().items(addressValidation),
   modules: Joi.array().items(Joi.string()),
   isActive: Joi.boolean(),
-  // NEW: Bank Details validation
-  bankDetails: Joi.object({
-    accountHolderName: Joi.string().trim().required(),
-    accountNumber: Joi.string().trim().required(),
-    ifscCode: Joi.string().trim().required(),
-    bankName: Joi.string().trim().required(),
-    branchName: Joi.string().trim().allow("", null).optional(),
-  }).optional(),
+  bankDetails: bankDetailsValidation.optional(),
 });
 
 export const categorySchema = Joi.object({
@@ -93,7 +85,7 @@ export const categorySchema = Joi.object({
       Joi.object({
         name: Joi.string().required(),
         label: Joi.string().optional(),
-      })
+      }),
     )
     .min(1)
     .required(),
@@ -124,6 +116,16 @@ export const supportSchema = Joi.object({
   }).required(),
 });
 
+const shippingAddressSchema = Joi.object({
+  address: Joi.string().required(),
+  city: Joi.string().required(),
+  state: Joi.string().required(),
+  country: Joi.string().required(),
+  pincode: Joi.string().allow("", null).optional(),
+  postalCode: Joi.string().allow("", null).optional(),
+  addressLine2: Joi.string().allow("", null).optional(),
+});
+
 export const orderSchema = Joi.object({
   customerId: Joi.string().hex().length(24).required(),
   items: Joi.array()
@@ -134,18 +136,12 @@ export const orderSchema = Joi.object({
         price: Joi.number().min(0).required(),
         quantity: Joi.number().min(1).required(),
         subtotal: Joi.number().min(0).required(),
-      })
+      }),
     )
     .min(1)
     .required(),
   totalAmount: Joi.number().min(0).required(),
-  shippingAddress: Joi.object({
-    address: Joi.string().required(),
-    pincode: Joi.string().required(),
-    city: Joi.string().required(),
-    state: Joi.string().required(),
-    country: Joi.string().required(),
-  }).required(),
+  shippingAddress: shippingAddressSchema.required(),
   paymentMethod: Joi.string().valid("online", "cod").required(),
   paymentInfo: Joi.object({
     razorpayOrderId: Joi.string(),
@@ -164,18 +160,12 @@ export const customerOrderSchema = Joi.object({
         price: Joi.number().min(0).required(),
         quantity: Joi.number().min(1).required(),
         subtotal: Joi.number().min(0).required(),
-      })
+      }),
     )
     .min(1)
     .required(),
   totalAmount: Joi.number().min(0).required(),
-  shippingAddress: Joi.object({
-    address: Joi.string().required(),
-    pincode: Joi.string().required(),
-    city: Joi.string().required(),
-    state: Joi.string().required(),
-    country: Joi.string().required(),
-  }).required(),
+  shippingAddress: shippingAddressSchema.required(),
 });
 
 // export const customerOrderSchema = Joi.object({
@@ -197,4 +187,3 @@ export const customerOrderSchema = Joi.object({
 //     country: Joi.string().required(),
 //   }).required(),
 // });
-

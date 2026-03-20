@@ -27,12 +27,26 @@ const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_TEST_KEY_ID,
   key_secret: process.env.RAZORPAY_TEST_KEY_SECRET,
 });
-const DELHIVERY_BASE_URL = "https://track.delhivery.com";
-const DELHIVERY_API_TOKEN = "7c61e302ae5975c0ad42d6bb555b5b12c9ee3b9c";
 
-function getDelhiveryHeaders() {
+const DELHIVERY_BASE_URL = "https://track.delhivery.com";
+
+// TANA RIRI OVERSEAS LLP Accounts
+const DELHIVERY_DOMESTIC_TOKEN =
+  process.env.DELHIVERY_DOMESTIC_TOKEN ;
+const DELHIVERY_INTL_TOKEN =
+  process.env.DELHIVERY_INTL_TOKEN ;
+
+function getDelhiveryToken(order) {
+  if (!order || !order.shippingAddress || !order.shippingAddress.country) {
+    return DELHIVERY_DOMESTIC_TOKEN;
+  }
+  const country = order.shippingAddress.country.toLowerCase();
+  return country === "india" ? DELHIVERY_DOMESTIC_TOKEN : DELHIVERY_INTL_TOKEN;
+}
+
+function getDelhiveryHeaders(token) {
   return {
-    Authorization: `Token ${DELHIVERY_API_TOKEN}`,
+    Authorization: `Token ${token}`,
     "Content-Type": "application/json",
     Accept: "application/json",
   };
@@ -100,25 +114,26 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
   try {
     for (const item of items) {
       const product = await Product.findById(item.productId).session(session);
-
-      if (!product) {
+      if (!product)
         throw new ApiError(404, `Product not found: ${item.productId}`);
-      }
-
       if (product.stock < item.quantity) {
         throw new ApiError(
           400,
           `Insufficient stock for product: ${product.productName}`,
         );
       }
-
       product.stock -= item.quantity;
       await product.save({ session });
     }
 
+    const isInternational = shippingAddress.country?.toLowerCase() !== "india";
+    const currency = isInternational ? "USD" : "INR";
+
+    const amountInSubunits = Math.round(totalAmount);
+
     const razorpayOrder = await createRazorpayOrder(
-      totalAmount,
-      "INR",
+      amountInSubunits,
+      currency,
       `order_${Date.now()}`,
     );
 
@@ -128,6 +143,7 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
           customerId,
           items,
           totalAmount,
+          currency,
           shippingAddress,
           paymentInfo: {
             razorpayOrderId: razorpayOrder.id,
@@ -159,85 +175,6 @@ export const createOrderByCustomer = asyncHandler(async (req, res) => {
     session.endSession();
   }
 });
-
-// export const createOrderByCustomer = asyncHandler(async (req, res) => {
-//   const { items, shippingAddress } = req.body;
-//   const customerId = req.user._id;
-
-//   const session = await mongoose.startSession();
-//   session.startTransaction();
-
-//   try {
-//     let calculatedTotal = 0;
-//     const finalItems = [];
-
-//     for (const item of items) {
-//       const product = await Product.findById(item.productId).session(session);
-
-//       if (!product) {
-//         throw new ApiError(404, "Product not found");
-//       }
-
-//       if (product.stock < item.quantity) {
-//         throw new ApiError(400, "Insufficient stock");
-//       }
-
-//       const price = product.discountPrice; // ₹200 (STORE RUPEES)
-//       const subtotal = price * item.quantity;
-
-//       finalItems.push({
-//         productId: product._id,
-//         name: product.productName,
-//         price,        // ₹200
-//         quantity: item.quantity,
-//         subtotal,     // ₹400
-//       });
-
-//       calculatedTotal += subtotal;
-
-//       product.stock -= item.quantity;
-//       await product.save({ session });
-//     }
-
-//     // shipping ₹20 example
-//     calculatedTotal += 20;
-
-//     // ✅ ONLY HERE convert to paise
-//     const razorpayOrder = await createRazorpayOrder(
-//       calculatedTotal * 100, // paise
-//       "INR",
-//       `order_${Date.now()}`
-//     );
-
-//     const order = await Order.create(
-//       [{
-//         customerId,
-//         items: finalItems,
-//         totalAmount: calculatedTotal, // ₹420
-//         shippingAddress,
-//         paymentInfo: {
-//           razorpayOrderId: razorpayOrder.id,
-//           status: "pending",
-//         },
-//       }],
-//       { session }
-//     );
-
-//     await session.commitTransaction();
-
-//     res.status(201).json(
-//       new ApiResponse(201, "Order created successfully", {
-//         order: order[0],
-//         razorpayOrder,
-//       })
-//     );
-//   } catch (err) {
-//     await session.abortTransaction();
-//     throw err;
-//   } finally {
-//     session.endSession();
-//   }
-// });
 
 export const cancelOrderByCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -456,8 +393,18 @@ export const generateInvoice = asyncHandler(async (req, res) => {
 
   doc.fontSize(14).text("Shipping Address:");
   doc.fontSize(10).text(order.shippingAddress.address);
+
+  if (order.shippingAddress.addressLine2) {
+    doc.text(order.shippingAddress.addressLine2);
+  }
+
+  const isIndia = order.shippingAddress.country?.toLowerCase() === "india";
+  const postal = isIndia
+    ? order.shippingAddress.pincode
+    : order.shippingAddress.postalCode;
+
   doc.text(
-    `${order.shippingAddress.city}, ${order.shippingAddress.state} ${order.shippingAddress.pincode}`,
+    `${order.shippingAddress.city}, ${order.shippingAddress.state} ${postal || ""}`,
   );
   doc.text(order.shippingAddress.country);
   doc.moveDown();
@@ -465,20 +412,22 @@ export const generateInvoice = asyncHandler(async (req, res) => {
   doc.fontSize(14).text("Items:");
   doc.moveDown(0.5);
 
+  const currencySymbol = order.currency === "USD" ? "$" : "Rs.";
+
   order.items.forEach((item, index) => {
     doc
       .fontSize(10)
       .text(
-        `${index + 1}. ${item.name} - Qty: ${item.quantity} x Rs.${(
+        `${index + 1}. ${item.name} - Qty: ${item.quantity} x ${currencySymbol}${(
           item.price / 100
-        ).toFixed(2)} = Rs.${(item.subtotal / 100).toFixed(2)}`,
+        ).toFixed(2)} = ${currencySymbol}${(item.subtotal / 100).toFixed(2)}`,
       );
   });
 
   doc.moveDown();
-  doc
-    .fontSize(14)
-    .text(`Total Amount: Rs.${order.totalAmount}`, { align: "right" });
+  doc.fontSize(14).text(`Total Amount: ${currencySymbol}${order.totalAmount}`, {
+    align: "right",
+  });
   doc.end();
 });
 
@@ -655,7 +604,6 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
     throw new ApiError(400, "No forward shipment for return");
   }
 
-  // Delhivery Return Shipment Payload
   const returnPayload = {
     cod_amount: 0,
     shipments: [
@@ -695,12 +643,14 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
   params.append("format", "json");
   params.append("data", JSON.stringify(returnPayload));
 
+  const apiToken = getDelhiveryToken(order);
+
   const response = await axios.post(
     `${DELHIVERY_BASE_URL}/api/cmu/create.json`,
     params.toString(),
     {
       headers: {
-        ...getDelhiveryHeaders(),
+        ...getDelhiveryHeaders(apiToken),
         "Content-Type": "application/x-www-form-urlencoded",
       },
     },
@@ -716,7 +666,6 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
     );
   }
 
-  // Update Return Request Data
   order.returnRequest.requestStatus = "approved";
   order.returnRequest.reviewedBy = adminId;
   order.returnRequest.reviewedAt = new Date();
@@ -727,13 +676,11 @@ export const approveReturnRequest = asyncHandler(async (req, res) => {
 
   await order.save();
 
-  // Check for COD / Manual Refund requirement at approval stage
   const isOnlinePayment =
     order.paymentInfo?.status === "completed" &&
     order.paymentInfo?.razorpayPaymentId;
 
   if (!isOnlinePayment) {
-    // Trigger alert immediately so admin can prepare for manual payout
     sendManualRefundAlert(order).catch((err) =>
       console.error("Admin Notification Error:", err),
     );
@@ -810,7 +757,6 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
       throw new ApiError(400, "Only approved return requests can be completed");
     }
 
-    // 1. Stock Update Logic
     for (const item of order.items) {
       const product = await Product.findById(item.productId._id).session(
         session,
@@ -821,7 +767,6 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
       }
     }
 
-    // 2. Razorpay Refund Logic
     let refund = null;
     if (
       order.paymentInfo &&
@@ -849,13 +794,11 @@ export const completeReturnRequest = asyncHandler(async (req, res) => {
       order.returnRequest.refundStatus = "manual_pending";
     }
 
-    // 3. Final Order Status Updates
     order.returnRequest.requestStatus = "completed";
     order.status = "return_completed";
     order.paymentInfo.status = "refunded";
 
     await order.save({ session });
-
     await session.commitTransaction();
 
     notifyReturnCompleted(order);
@@ -990,7 +933,6 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
 
   const isPrepaid = order.paymentInfo?.status === "completed";
 
-  // Dynamic products description & quantity
   const productsDesc = order.items
     .map((item) => `${item.name} x${item.quantity}`)
     .join(", ");
@@ -1000,7 +942,6 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
     0,
   );
 
-  // Pickup location validation
   const pickup_location = {
     name: process.env.PICKUP_NAME,
     add: process.env.PICKUP_ADDRESS,
@@ -1024,11 +965,11 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
         add: order.shippingAddress.address,
         name: `${order.customerId.firstName} ${order.customerId.lastName}`,
         phone: `+91${order.customerId.phone}`,
-        pin: order.shippingAddress.pincode,
+        pin: order.shippingAddress.pincode || order.shippingAddress.postalCode,
         order_date: new Date().toISOString(),
         payment_mode: isPrepaid ? "Prepaid" : "COD",
         cod_amount: parseInt(order.totalAmount).toString(),
-        shipping_mode: "Surface",
+        shipping_mode: "Express",
         products_desc: productsDesc || "E-commerce Order",
         quantity: totalQuantity.toString(),
         total_weight: "1.5",
@@ -1042,23 +983,20 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
   params.append("format", "json");
   params.append("data", JSON.stringify(dataPayload));
 
-  console.log("=== Delhivery Request Payload ===");
-  console.log(JSON.stringify(dataPayload, null, 2));
+  const apiToken = getDelhiveryToken(order);
 
   const response = await axios.post(
     `${DELHIVERY_BASE_URL}/api/cmu/create.json`,
     params.toString(),
     {
       headers: {
-        ...getDelhiveryHeaders(),
+        ...getDelhiveryHeaders(apiToken),
         "Content-Type": "application/x-www-form-urlencoded",
       },
     },
   );
 
   const dlvData = response.data;
-  console.log("=== Delhivery Response ===");
-  console.log(JSON.stringify(dlvData, null, 2));
 
   const waybill = dlvData?.packages?.[0]?.waybill || null;
 
@@ -1067,14 +1005,12 @@ export const shipOrderWithDelhivery = asyncHandler(async (req, res) => {
       ? dlvData.packages[0].remarks.join(" | ")
       : dlvData?.rmk || "No remarks provided";
 
-    console.error("Delhivery response (no waybill):", dlvData);
     throw new ApiError(
       502,
       `Delhivery failed to create shipment. Remarks: ${remarksText}`,
     );
   }
 
-  // Save order
   order.waybill = waybill;
   order.courier = "delhivery";
   order.status = "shipped";
@@ -1109,6 +1045,8 @@ export const cancelShipment = asyncHandler(async (req, res) => {
   }
 
   try {
+    const apiToken = getDelhiveryToken(order);
+
     const delhiveryResponse = await axios.post(
       `${DELHIVERY_BASE_URL}/api/p/edit`,
       {
@@ -1116,10 +1054,7 @@ export const cancelShipment = asyncHandler(async (req, res) => {
         cancellation: true,
       },
       {
-        headers: {
-          ...getDelhiveryHeaders(),
-          "Content-Type": "application/json",
-        },
+        headers: getDelhiveryHeaders(apiToken),
       },
     );
 
@@ -1143,10 +1078,6 @@ export const cancelShipment = asyncHandler(async (req, res) => {
       }),
     );
   } catch (error) {
-    console.error(
-      "Shipment Cancellation Error:",
-      error.response?.data || error.message,
-    );
     throw new ApiError(
       error.response?.status || 502,
       error.response?.data?.error ||
@@ -1171,9 +1102,11 @@ export const downloadShippingLabel = asyncHandler(async (req, res) => {
   }
 
   try {
+    const apiToken = getDelhiveryToken(order);
+
     const delhiveryResponse = await axios.get(
       `${DELHIVERY_BASE_URL}/api/p/packing_slip?wbns=${order.waybill}`,
-      { headers: getDelhiveryHeaders() },
+      { headers: getDelhiveryHeaders(apiToken) },
     );
 
     const labelData = delhiveryResponse.data?.packages?.[0];
@@ -1384,11 +1317,13 @@ export const scheduleOrderPickup = asyncHandler(async (req, res) => {
   };
 
   try {
+    const apiToken = getDelhiveryToken(order);
+
     const response = await axios.post(
       `${DELHIVERY_BASE_URL}/fm/request/new/`,
       pickupPayload,
       {
-        headers: getDelhiveryHeaders(),
+        headers: getDelhiveryHeaders(apiToken),
       },
     );
 
@@ -1404,10 +1339,6 @@ export const scheduleOrderPickup = asyncHandler(async (req, res) => {
       }),
     );
   } catch (error) {
-    console.error(
-      "Delhivery Pickup Error:",
-      error.response?.data || error.message,
-    );
     throw new ApiError(
       502,
       `Delhivery pickup failed: ${error.response?.data?.message || error.message}`,
@@ -1419,6 +1350,9 @@ export const scheduleOrderPickup = asyncHandler(async (req, res) => {
 export const trackDelhiveryShipment = asyncHandler(async (req, res) => {
   const { waybill } = req.params;
 
+  const order = await Order.findOne({ waybill });
+  const apiToken = getDelhiveryToken(order);
+
   const endpoints = [
     `${DELHIVERY_BASE_URL}/api/pms/?filter=waybill:${waybill}`,
     `${DELHIVERY_BASE_URL}/api/pms/waybill/${waybill}`,
@@ -1428,19 +1362,13 @@ export const trackDelhiveryShipment = asyncHandler(async (req, res) => {
 
   for (const endpoint of endpoints) {
     try {
-      console.log(`Trying endpoint: ${endpoint}`);
-
       const response = await axios.get(endpoint, {
-        headers: {
-          ...getDelhiveryHeaders(),
-          "Content-Type": "application/json",
-        },
+        headers: getDelhiveryHeaders(apiToken),
         timeout: 5000,
       });
 
       const data = response.data;
 
-      // Success - return tracking data
       return res.json(
         new ApiResponse(200, "Tracking found", {
           waybill,
@@ -1451,12 +1379,10 @@ export const trackDelhiveryShipment = asyncHandler(async (req, res) => {
         }),
       );
     } catch (error) {
-      console.log(`Endpoint failed: ${endpoint} - ${error.response?.status}`);
-      continue; // Try next endpoint
+      continue;
     }
   }
 
-  // All endpoints failed
   res.status(404).json(
     new ApiResponse(404, "Waybill not found or too early", {
       waybill,
@@ -1470,19 +1396,18 @@ export const publicTrackShipment = asyncHandler(async (req, res) => {
   const { waybill } = req.params;
 
   try {
+    const order = await Order.findOne({ waybill });
+    const apiToken = getDelhiveryToken(order);
+
     const response = await axios.get(
       `${DELHIVERY_BASE_URL}/api/pms/?filter=waybill:${waybill}`,
       {
-        headers: getDelhiveryHeaders(),
+        headers: getDelhiveryHeaders(apiToken),
         timeout: 10000,
       },
     );
 
     const data = response.data;
-
-    if (data.current_status?.status === "Delivered") {
-      await sendDeliverySMS(waybill, data.customer_mobile);
-    }
 
     res.json({
       success: true,
@@ -1516,27 +1441,17 @@ export const delhiveryWebhook = asyncHandler(async (req, res) => {
 
   try {
     const payload = req.body;
-    console.log("=== Delhivery Webhook Payload ===", JSON.stringify(payload));
-
     const incomingWaybill = payload.Waybill || payload.waybill || payload.awb;
     const trackingStatus =
       payload.Status?.Status || payload.status || payload.current_status;
 
-    if (!incomingWaybill || !trackingStatus) {
-      console.warn("Invalid webhook payload received:", payload);
-      return;
-    }
+    if (!incomingWaybill || !trackingStatus) return;
 
     const order = await Order.findOne({
       $or: [{ waybill: incomingWaybill }, { returnWaybill: incomingWaybill }],
     });
 
-    if (!order) {
-      console.warn(
-        `Webhook Error: Order with waybill ${incomingWaybill} not found in DB.`,
-      );
-      return;
-    }
+    if (!order) return;
 
     const statusLower = trackingStatus.toLowerCase();
 
@@ -1566,9 +1481,6 @@ export const delhiveryWebhook = asyncHandler(async (req, res) => {
       }
 
       await order.save();
-      console.log(
-        `[Webhook-Forward] Order ${order._id} tracking updated to: ${trackingStatus}`,
-      );
     } else if (order.returnWaybill === incomingWaybill) {
       order.returnTrackingStatus = trackingStatus;
 
@@ -1577,9 +1489,6 @@ export const delhiveryWebhook = asyncHandler(async (req, res) => {
       }
 
       await order.save();
-      console.log(
-        `[Webhook-Reverse] Order ${order._id} return tracking updated to: ${trackingStatus}`,
-      );
     }
   } catch (error) {
     console.error("Webhook Background Processing Error:", error.message);
@@ -1613,16 +1522,17 @@ export const bulkDownloadShippingLabels = asyncHandler(async (req, res) => {
   }
 
   const waybills = orders.map((o) => o.waybill);
-
   const orderMap = {};
   orders.forEach((o) => {
     orderMap[o.waybill] = o;
   });
 
   try {
+    const apiToken = getDelhiveryToken(orders[0]); // Uses token based on the first order in batch
+
     const delhiveryResponse = await axios.get(
       `${DELHIVERY_BASE_URL}/api/p/packing_slip?wbns=${waybills.join(",")}`,
-      { headers: getDelhiveryHeaders() },
+      { headers: getDelhiveryHeaders(apiToken) },
     );
 
     const packages = delhiveryResponse.data?.packages;
@@ -1807,7 +1717,6 @@ export const bulkDownloadShippingLabels = asyncHandler(async (req, res) => {
 
     doc.end();
   } catch (error) {
-    console.error("Bulk Label Error:", error.message);
     throw new ApiError(502, "Failed to generate bulk shipping labels.");
   }
 });
@@ -1983,10 +1892,15 @@ export const getAllReverseShipments = asyncHandler(async (req, res) => {
 
   if (waybillsToSync.length > 0) {
     try {
+      const apiToken =
+        reverseShipments.length > 0
+          ? getDelhiveryToken(reverseShipments[0])
+          : DELHIVERY_DOMESTIC_TOKEN;
+
       const delhiveryResponse = await axios.get(
         `${DELHIVERY_BASE_URL}/api/v1/packages/json/?waybill=${waybillsToSync.join(",")}`,
         {
-          headers: getDelhiveryHeaders(),
+          headers: getDelhiveryHeaders(apiToken),
         },
       );
 
@@ -2185,7 +2099,6 @@ export const generateDailyManifest = asyncHandler(async (req, res) => {
   doc.text("Customer Name", 320, tableTop);
   doc.text("Payment", 450, tableTop);
 
-  // Header Line
   doc
     .moveTo(30, tableTop + 15)
     .lineTo(560, tableTop + 15)
@@ -2256,7 +2169,6 @@ export const delhiveryRemittanceWebhook = asyncHandler(async (req, res) => {
 
     const statusLower = remittanceStatus ? remittanceStatus.toLowerCase() : "";
 
-    // Status check
     if (
       statusLower.includes("settled") ||
       statusLower.includes("remitted") ||
