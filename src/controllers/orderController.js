@@ -31,10 +31,8 @@ const razorpay = new Razorpay({
 const DELHIVERY_BASE_URL = "https://track.delhivery.com";
 
 // TANA RIRI OVERSEAS LLP Accounts
-const DELHIVERY_DOMESTIC_TOKEN =
-  process.env.DELHIVERY_DOMESTIC_TOKEN ;
-const DELHIVERY_INTL_TOKEN =
-  process.env.DELHIVERY_INTL_TOKEN ;
+const DELHIVERY_DOMESTIC_TOKEN = process.env.DELHIVERY_DOMESTIC_TOKEN;
+const DELHIVERY_INTL_TOKEN = process.env.DELHIVERY_INTL_TOKEN;
 
 function getDelhiveryToken(order) {
   if (!order || !order.shippingAddress || !order.shippingAddress.country) {
@@ -365,7 +363,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     throw new ApiError(403, "Access denied");
   }
 
-  const doc = new PDFDocument();
+  const doc = new PDFDocument({ size: "A4", margin: 30 });
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
@@ -375,27 +373,161 @@ export const generateInvoice = asyncHandler(async (req, res) => {
 
   doc.pipe(res);
 
-  doc.fontSize(20).text("INVOICE", { align: "center" });
-  doc.moveDown();
+  const brandColor = "#172554";
+  const textColor = "#000000";
+  const currencySymbol = order.currency === "USD" ? "$" : "Rs. ";
 
-  doc.fontSize(12).text(`Order ID: ${order._id}`);
-  doc.text(`Date: ${new Date(order.createdAt).toLocaleDateString()}`);
-  doc.text(`Status: ${order.status}`);
-  doc.moveDown();
+  const formatPrice = (amount) => {
+    return `${currencySymbol}${(amount / 100).toFixed(2)}`;
+  };
 
-  doc.fontSize(14).text("Customer Details:");
+  const startX = 30;
+  const endX = 565;
+  const contentWidth = 535;
+  const pageHeight = 842;
+  const contentHeight = pageHeight - 60;
+
+  doc.strokeColor(brandColor);
+
+  doc.lineWidth(1.5).rect(startX, 30, contentWidth, contentHeight).stroke();
+  doc.lineWidth(1);
+
+  const headerY = 30;
+  const headerHeight = 80;
+  doc.rect(startX, headerY, contentWidth, headerHeight).stroke();
+
+  const headerCol1 = startX + 140;
+  const headerCol2 = headerCol1 + 240;
+
   doc
+    .moveTo(headerCol1, headerY)
+    .lineTo(headerCol1, headerY + headerHeight)
+    .stroke();
+  doc
+    .moveTo(headerCol2, headerY)
+    .lineTo(headerCol2, headerY + headerHeight)
+    .stroke();
+
+  try {
+    const logoPath = path.resolve("src/assets/tanariri-logo.png");
+    if (fs.existsSync(logoPath)) {
+      doc.image(logoPath, startX + 10, headerY + 15, {
+        fit: [120, 50],
+        align: "center",
+        valign: "center",
+      });
+    }
+  } catch (err) {}
+
+  doc
+    .fillColor(brandColor)
+    .fontSize(14)
+    .font("Helvetica-Bold")
+    .text("TANARIRI OVERSEAS LLP", headerCol1 + 10, headerY + 10);
+  doc
+    .fillColor(textColor)
+    .fontSize(9)
+    .font("Helvetica-Bold")
+    .text("Address: ", headerCol1 + 10, headerY + 30, { continued: true })
+    .font("Helvetica")
+    .text("207, Shyam Kunj, Shree Shyam Heights,", { width: 220, lineGap: 2 })
+    .text("Sampat Hills, Bicholi Marda, Indore, 452016, India", {
+      width: 220,
+      lineGap: 2,
+    });
+  doc
+    .font("Helvetica-Bold")
+    .text("Web: ", headerCol1 + 10, headerY + 60, { continued: true })
+    .font("Helvetica")
+    .text("www.tanaririllp.com");
+
+  doc
+    .fillColor(brandColor)
+    .fontSize(20)
+    .font("Helvetica-Bold")
+    .text("TAX INVOICE", headerCol2, headerY + 30, {
+      width: 155,
+      align: "center",
+    });
+
+  const infoY = 110;
+  const infoHeight = 30;
+  doc.rect(startX, infoY, contentWidth, infoHeight).stroke();
+
+  doc
+    .moveTo(startX + 180, infoY)
+    .lineTo(startX + 180, infoY + infoHeight)
+    .stroke();
+  doc
+    .moveTo(startX + 360, infoY)
+    .lineTo(startX + 360, infoY + infoHeight)
+    .stroke();
+
+  doc.fillColor(textColor).fontSize(9).font("Helvetica-Bold");
+  doc.text("Invoice No:", startX + 10, infoY + 10);
+  doc
+    .font("Helvetica")
+    .text(
+      `#${order.invoiceNo || order._id.toString().slice(-8).toUpperCase()}`,
+      startX + 65,
+      infoY + 10,
+    );
+
+  doc.font("Helvetica-Bold").text("Order Date:", startX + 190, infoY + 10);
+  doc
+    .font("Helvetica")
+    .text(
+      new Date(order.createdAt).toLocaleDateString("en-IN"),
+      startX + 250,
+      infoY + 10,
+    );
+
+  doc.font("Helvetica-Bold").text("Status:", startX + 370, infoY + 10);
+  doc
+    .font("Helvetica")
+    .fillColor(brandColor)
+    .text(order.status.toUpperCase(), startX + 410, infoY + 10);
+
+  const addressY = 140;
+  const addressHeight = 120;
+  const halfWidth = contentWidth / 2;
+
+  doc.fillColor(textColor);
+  doc.rect(startX, addressY, halfWidth, addressHeight).stroke();
+  doc.rect(startX + halfWidth, addressY, halfWidth, addressHeight).stroke();
+
+  doc
+    .font("Helvetica-Bold")
     .fontSize(10)
-    .text(`Name: ${order.customerId.firstName} ${order.customerId.lastName}`);
-  doc.text(`Email: ${order.customerId.email}`);
-  doc.text(`Phone: ${order.customerId.phone}`);
-  doc.moveDown();
+    .text("Sold By:", startX + 10, addressY + 10);
+  doc
+    .font("Helvetica")
+    .fontSize(9)
+    .text("TANARIRI OVERSEAS LLP", startX + 10, addressY + 25)
+    .text("207, Shyam Kunj, Shree Shyam Heights,", startX + 10, addressY + 40)
+    .text("Sampat Hills, Bicholi Mardana,", startX + 10, addressY + 55)
+    .text("Indore - 452016, Madhya Pradesh", startX + 10, addressY + 70)
+    .text("India", startX + 10, addressY + 85);
 
-  doc.fontSize(14).text("Shipping Address:");
-  doc.fontSize(10).text(order.shippingAddress.address);
+  const rightX = startX + halfWidth + 10;
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Consignee / Delivery Address:", rightX, addressY + 10);
+  doc
+    .font("Helvetica")
+    .fontSize(9)
+    .text(
+      `${order.customerId.firstName} ${order.customerId.lastName}`,
+      rightX,
+      addressY + 25,
+    )
+    .text(order.shippingAddress.address, rightX, addressY + 40);
 
+  let currentAddressY = addressY + 55;
   if (order.shippingAddress.addressLine2) {
-    doc.text(order.shippingAddress.addressLine2);
+    doc.text(order.shippingAddress.addressLine2, rightX, currentAddressY);
+    currentAddressY += 15;
   }
 
   const isIndia = order.shippingAddress.country?.toLowerCase() === "india";
@@ -403,31 +535,234 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     ? order.shippingAddress.pincode
     : order.shippingAddress.postalCode;
 
-  doc.text(
-    `${order.shippingAddress.city}, ${order.shippingAddress.state} ${postal || ""}`,
-  );
-  doc.text(order.shippingAddress.country);
-  doc.moveDown();
+  doc
+    .text(
+      `${order.shippingAddress.city}, ${order.shippingAddress.state} ${postal || ""}`,
+      rightX,
+      currentAddressY,
+    )
+    .text(order.shippingAddress.country, rightX, currentAddressY + 15)
+    .font("Helvetica-Bold")
+    .text(
+      `Phone: ${order.customerId.phone || "N/A"}`,
+      rightX,
+      currentAddressY + 30,
+    );
 
-  doc.fontSize(14).text("Items:");
-  doc.moveDown(0.5);
+  const tableY = 260;
+  const rowHeight = 25;
 
-  const currencySymbol = order.currency === "USD" ? "$" : "Rs.";
+  const col1 = startX;
+  const col2 = startX + 40;
+  const col3 = startX + 300;
+  const col4 = startX + 360;
+  const col5 = startX + 440;
+  const col6 = endX;
+
+  doc
+    .rect(startX, tableY, contentWidth, rowHeight)
+    .fillAndStroke("#f8fafc", brandColor);
+
+  doc.fillColor(textColor).font("Helvetica-Bold").fontSize(9);
+  doc.text("S.No", col1 + 5, tableY + 8);
+  doc.text("Product Description", col2 + 5, tableY + 8);
+  doc.text("Qty", col3, tableY + 8, { width: 60, align: "center" });
+  doc.text("Unit Cost", col4, tableY + 8, { width: 75, align: "right" });
+  doc.text("Total", col5, tableY + 8, { width: 90, align: "right" });
+
+  doc
+    .moveTo(col2, tableY)
+    .lineTo(col2, tableY + rowHeight)
+    .stroke();
+  doc
+    .moveTo(col3, tableY)
+    .lineTo(col3, tableY + rowHeight)
+    .stroke();
+  doc
+    .moveTo(col4, tableY)
+    .lineTo(col4, tableY + rowHeight)
+    .stroke();
+  doc
+    .moveTo(col5, tableY)
+    .lineTo(col5, tableY + rowHeight)
+    .stroke();
+
+  let currentY = tableY + rowHeight;
+  doc.font("Helvetica").fontSize(9);
 
   order.items.forEach((item, index) => {
+    if (currentY > 650) {
+      doc.addPage();
+      doc.lineWidth(1.5).rect(startX, 30, contentWidth, contentHeight).stroke();
+      doc.lineWidth(1);
+      currentY = 30;
+    }
+
+    const itemName =
+      item.name || item.productId?.productName || "Unknown Product";
+
+    doc.text((index + 1).toString(), col1 + 5, currentY + 8);
+    doc.text(itemName, col2 + 5, currentY + 8, {
+      width: 250,
+      lineBreak: false,
+    });
+    doc.text(item.quantity.toString(), col3, currentY + 8, {
+      width: 60,
+      align: "center",
+    });
+    doc.text(formatPrice(item.price), col4, currentY + 8, {
+      width: 75,
+      align: "right",
+    });
+    doc.text(formatPrice(item.subtotal), col5, currentY + 8, {
+      width: 90,
+      align: "right",
+    });
+
     doc
-      .fontSize(10)
-      .text(
-        `${index + 1}. ${item.name} - Qty: ${item.quantity} x ${currencySymbol}${(
-          item.price / 100
-        ).toFixed(2)} = ${currencySymbol}${(item.subtotal / 100).toFixed(2)}`,
-      );
+      .moveTo(startX, currentY + rowHeight)
+      .lineTo(endX, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col1, currentY)
+      .lineTo(col1, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col2, currentY)
+      .lineTo(col2, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col3, currentY)
+      .lineTo(col3, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col4, currentY)
+      .lineTo(col4, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col5, currentY)
+      .lineTo(col5, currentY + rowHeight)
+      .stroke();
+    doc
+      .moveTo(col6, currentY)
+      .lineTo(col6, currentY + rowHeight)
+      .stroke();
+
+    currentY += rowHeight;
   });
 
-  doc.moveDown();
-  doc.fontSize(14).text(`Total Amount: ${currencySymbol}${order.totalAmount}`, {
+  if (currentY > 650) {
+    doc.addPage();
+    doc.lineWidth(1.5).rect(startX, 30, contentWidth, contentHeight).stroke();
+    doc.lineWidth(1);
+    currentY = 30;
+  }
+
+  const baseTotalCents = order.items.reduce(
+    (sum, item) => sum + (item.subtotal || 0),
+    0,
+  );
+  const baseTotal = baseTotalCents / 100;
+  const grandTotal = Number(order.totalAmount || 0);
+  const taxAmount = grandTotal - baseTotal;
+
+  doc.lineWidth(1).strokeColor(brandColor);
+
+  doc.rect(col4, currentY, endX - col4, rowHeight).stroke();
+  doc
+    .font("Helvetica-Bold")
+    .text("Tax", col4, currentY + 8, { width: 75, align: "center" });
+  doc
+    .moveTo(col5, currentY)
+    .lineTo(col5, currentY + rowHeight)
+    .stroke();
+  doc
+    .font("Helvetica")
+    .text(`${currencySymbol}${taxAmount.toFixed(2)}`, col5, currentY + 8, {
+      width: 90,
+      align: "right",
+    });
+  currentY += rowHeight;
+
+  doc.lineWidth(2).strokeColor(brandColor);
+  doc.rect(col4, currentY, endX - col4, rowHeight).stroke();
+  doc
+    .font("Helvetica-Bold")
+    .text("Grand Total", col4, currentY + 8, { width: 75, align: "center" });
+  doc
+    .moveTo(col5, currentY)
+    .lineTo(col5, currentY + rowHeight)
+    .stroke();
+  doc.text(`${currencySymbol}${grandTotal.toFixed(2)}`, col5, currentY + 8, {
+    width: 90,
     align: "right",
   });
+  currentY += rowHeight;
+
+  doc.lineWidth(1);
+
+  const footerY = currentY + 40;
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(10)
+    .text("Declaration:", startX + 5, footerY);
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .text(
+      "We declare that this invoice shows the actual price of the goods described and that all particulars",
+      startX + 5,
+      footerY + 15,
+    )
+    .text("are true and correct.", startX + 5, footerY + 30)
+    .text(
+      "This is a computer-generated document. No physical signature is required.",
+      startX + 5,
+      footerY + 45,
+    );
+
+  doc.rect(400, footerY, 165, 60).stroke();
+
+  doc
+    .font("Helvetica-Bold")
+    .fontSize(9)
+    .fillColor(brandColor)
+    .text("For TANARIRI OVERSEAS LLP", 400, footerY + 5, {
+      width: 165,
+      align: "center",
+    });
+
+  doc.fillColor(textColor);
+
+  try {
+    const stampPath = path.resolve("src/assets/Stamp.png");
+    if (fs.existsSync(stampPath)) {
+      doc.image(stampPath, 450, footerY + 12, {
+        fit: [65, 40],
+        valign: "center",
+      });
+    }
+  } catch (err) {}
+
+  try {
+    const signaturePath = path.resolve("src/assets/signature.png");
+    if (fs.existsSync(signaturePath)) {
+      doc.image(signaturePath, 417, footerY + 12, {
+        width: 130,
+        align: "center",
+      });
+    }
+  } catch (err) {}
+
+  doc
+    .font("Helvetica")
+    .fontSize(8)
+    .text("Authorised Signatory", 400, footerY + 45, {
+      width: 165,
+      align: "center",
+    });
+
   doc.end();
 });
 
